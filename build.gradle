@@ -23,9 +23,7 @@ minecraft {
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
             mods {
-                ad_astra_cargo_rockets {
-                    source sourceSets.main
-                }
+                ad_astra_cargo_rockets { source sourceSets.main }
             }
         }
         server {
@@ -33,9 +31,7 @@ minecraft {
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
             mods {
-                ad_astra_cargo_rockets {
-                    source sourceSets.main
-                }
+                ad_astra_cargo_rockets { source sourceSets.main }
             }
         }
     }
@@ -45,47 +41,35 @@ repositories {
     maven {
         name = "Modrinth"
         url = "https://api.modrinth.com/maven"
-        content {
-            includeGroup "maven.modrinth"
-        }
+        content { includeGroup "maven.modrinth" }
     }
-    maven {
-        url "https://cursemaven.com"
-    }
+    maven { url "https://cursemaven.com" }
     maven {
         url "https://maven.squiddev.cc"
-        content {
-            includeGroup "cc.tweaked"
-        }
+        content { includeGroup "cc.tweaked" }
     }
-    maven {
-        url "https://maven.minecraftforge.net"
-    }
+    maven { url "https://maven.minecraftforge.net" }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
 
-    // CC: Tweaked for Forge
-    compileOnly(fg.deobf("cc.tweaked:cc-tweaked-${project.minecraft_version}-forge-api:${project.cc_tweaked_version}"))
-    runtimeOnly(fg.deobf("cc.tweaked:cc-tweaked-${project.minecraft_version}-forge:${project.cc_tweaked_version}"))
+    // CC: Tweaked Forge API - fg.deobfなしで直接取得
+    compileOnly "cc.tweaked:cc-tweaked-${project.minecraft_version}-forge-api:${project.cc_tweaked_version}"
 
-    // Forge Energy (built into Forge, no extra dep needed)
-    // Gson (included in Minecraft)
+    compileOnly 'org.jetbrains:annotations:24.0.1'
 }
 
 processResources {
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
     inputs.property "forge_version", project.forge_version
-    inputs.property "cc_tweaked_version", project.cc_tweaked_version
     filteringCharset "UTF-8"
 
     filesMatching("META-INF/mods.toml") {
         expand "version": project.version,
                 "minecraft_version": project.minecraft_version,
-                "forge_version": project.forge_version,
-                "cc_tweaked_version": project.cc_tweaked_version
+                "forge_version": project.forge_version
     }
 }
 
@@ -109,13 +93,4 @@ jar {
         ])
     }
     from(["LICENSE.txt"])
-}
-
-publishing {
-    publications {
-        create("mavenJava", MavenPublication) {
-            artifactId = project.archives_base_name
-            from components.java
-        }
-    }
 }
