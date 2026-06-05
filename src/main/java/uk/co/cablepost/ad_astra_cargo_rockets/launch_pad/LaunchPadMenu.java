@@ -5,7 +5,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 
 public class LaunchPadMenu extends AbstractContainerMenu {

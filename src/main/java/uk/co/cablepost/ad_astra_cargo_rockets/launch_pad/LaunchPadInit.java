@@ -8,8 +8,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -20,31 +20,26 @@ public class LaunchPadInit {
     private RegistryObject<LaunchPadBlock> block;
     private RegistryObject<BlockEntityType<LaunchPadBlockEntity>> blockEntityType;
     private RegistryObject<MenuType<LaunchPadMenu>> menuType;
-    private RegistryObject<Item> blockItem;
 
-    /** Must be called from the mod constructor before registering */
     public void register(IEventBus bus) {
         // Blocks
         DeferredRegister<Block> blocks = DeferredRegister.create(ForgeRegistries.BLOCKS, AdAstraCargoRockets.MOD_ID);
         block = blocks.register("launch_pad", () -> new LaunchPadBlock(BlockBehaviour.Properties.of()
-                .strength(3.5f)
-                .requiresCorrectToolForDrops()
-                .noOcclusion()));
+                .strength(3.5f).requiresCorrectToolForDrops().noOcclusion()));
         blocks.register(bus);
 
-        // Block Items
-        DeferredRegister<Item> items = AdAstraCargoRockets.ITEMS;
-        blockItem = items.register("launch_pad", () -> new BlockItem(block.get(), new Item.Properties()));
+        // Block Items (register into shared ITEMS register)
+        AdAstraCargoRockets.ITEMS.register("launch_pad",
+                () -> new BlockItem(block.get(), new Item.Properties()));
 
         // Block Entity Types
-        DeferredRegister<BlockEntityType<?>> beTypes = AdAstraCargoRockets.BLOCK_ENTITY_TYPES;
-        blockEntityType = beTypes.register("launch_pad",
+        blockEntityType = AdAstraCargoRockets.BLOCK_ENTITY_TYPES.register("launch_pad",
                 () -> BlockEntityType.Builder.of(LaunchPadBlockEntity::new, block.get()).build(null));
 
-        // Menu Types
+        // Menu Types - IForgeMenuType.create handles the extra buf argument
         DeferredRegister<MenuType<?>> menus = DeferredRegister.create(ForgeRegistries.MENU_TYPES, AdAstraCargoRockets.MOD_ID);
         menuType = menus.register("launch_pad",
-                () -> new MenuType<>((id, inv) -> new LaunchPadMenu(id, inv, null)));
+                () -> IForgeMenuType.create((id, inv, buf) -> new LaunchPadMenu(id, inv, null)));
         menus.register(bus);
 
         // Client events

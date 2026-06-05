@@ -22,8 +22,9 @@ public class LaunchPadBlockEntityRenderer implements BlockEntityRenderer<LaunchP
                        PoseStack matrices, MultiBufferSource buffers,
                        int light, int overlay) {
         matrices.pushPose();
-        matrices.translate(0.5f, 2f, 0.5f);
-        matrices.translate(-0.5, -2, -0.5);
+        matrices.translate(0.5, 2.0, 0.5);
+        matrices.translate(-0.5, -2.0, -0.5);
+        // 180度回転 + PI回転 (元コードと同じ)
         matrices.mulPose(Axis.XP.rotationDegrees(180.0F));
         matrices.mulPose(Axis.XP.rotation((float) Math.PI));
 

@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.network.NetworkHooks;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 import uk.co.cablepost.ad_astra_cargo_rockets.CargoRocketItem;
 import uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketEntity;

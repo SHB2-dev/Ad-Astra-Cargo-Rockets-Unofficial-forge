@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.registries.ForgeRegistries;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.AbstractFluidMachineBlockEntity;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 import uk.co.cablepost.ad_astra_cargo_rockets.ModConfig;

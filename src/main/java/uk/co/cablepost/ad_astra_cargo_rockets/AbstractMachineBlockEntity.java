@@ -17,8 +17,8 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.energy.EnergyStorage;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,7 +60,7 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
         ItemStackHandler handler = new ItemStackHandler(totalSlots) {
             @Override
-            public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
                 return AbstractMachineBlockEntity.this.canPlaceItem(slot, stack);
             }
             @Override
@@ -178,7 +178,7 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
     // --- Capabilities ---
 
     @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+    public @Nonnull <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.ITEM_HANDLER) return itemHandler.cast();
         if (cap == ForgeCapabilities.ENERGY) return energyHandler.cast();
         return super.getCapability(cap, side);

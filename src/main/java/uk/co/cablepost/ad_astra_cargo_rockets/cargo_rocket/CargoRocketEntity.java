@@ -2,7 +2,6 @@ package uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -31,7 +30,6 @@ import java.util.Objects;
 public class CargoRocketEntity extends Entity {
     public String targetPlanet = "";
 
-    // SimpleInventory equivalent using a NonNullList
     private final net.minecraft.core.NonNullList<ItemStack> inventory =
             net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
 
@@ -73,9 +71,7 @@ public class CargoRocketEntity extends Entity {
     public void setLaunchTicks(int ticks) { entityData.set(TRACKED_LAUNCH_TICKS, ticks); }
     public int getLaunchTicks() { return entityData.get(TRACKED_LAUNCH_TICKS); }
 
-    /** Expose inventory as a simple Container for peripheral use */
     public net.minecraft.world.SimpleContainer getInventory() {
-        // Wrap NonNullList in a SimpleContainer each call is fine for our use
         net.minecraft.world.SimpleContainer c = new net.minecraft.world.SimpleContainer(9) {
             @Override public ItemStack getItem(int slot) { return inventory.get(slot); }
             @Override public void setItem(int slot, ItemStack stack) { inventory.set(slot, stack); }
@@ -86,7 +82,6 @@ public class CargoRocketEntity extends Entity {
 
     @Override public boolean canBeCollidedWith() { return true; }
     @Override public boolean isPushable() { return false; }
-    @Override public boolean isIgnoringBlockTriggers() { return true; }
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
@@ -138,11 +133,7 @@ public class CargoRocketEntity extends Entity {
     public void tick() {
         super.tick();
         setPos(getX(), getY() + getDeltaMovement().y, getZ());
-
-        if (level().isClientSide) {
-            clientTick();
-            return;
-        }
+        if (level().isClientSide) { clientTick(); return; }
         serverTick();
     }
 
@@ -153,16 +144,12 @@ public class CargoRocketEntity extends Entity {
             for (int i = 1; i < 30; i++) {
                 BlockPos check = blockPosition().below(i);
                 if (!level().getBlockState(check).getCollisionShape(level(), check).isEmpty()) {
-                    groundNearby = true;
-                    break;
+                    groundNearby = true; break;
                 }
             }
             if (groundNearby) {
                 spawnFlameParticles();
-                if (!hasPlayedLandingSound) {
-                    hasPlayedLandingSound = true;
-                    playLaunchSound();
-                }
+                if (!hasPlayedLandingSound) { hasPlayedLandingSound = true; playLaunchSound(); }
             } else {
                 hasPlayedLandingSound = false;
             }
@@ -178,48 +165,36 @@ public class CargoRocketEntity extends Entity {
 
     private void spawnFlameParticles() {
         for (int i = 0; i < 3; i++) {
-            level().addParticle(getParticleOrDefault("ad_astra:large_flame", ParticleTypes.FLAME), true,
+            level().addParticle(ParticleTypes.FLAME, true,
                     getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-            level().addParticle(getParticleOrDefault("ad_astra:large_smoke", ParticleTypes.CAMPFIRE_COSY_SMOKE), true,
+            level().addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, true,
                     getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
         }
     }
 
-    private net.minecraft.core.particles.ParticleOptions getParticleOrDefault(
-            String id, net.minecraft.core.particles.ParticleOptions fallback) {
-        var pt = ForgeRegistries.PARTICLE_TYPES.getValue(new ResourceLocation(id));
-        return (pt instanceof net.minecraft.core.particles.ParticleOptions po) ? po : fallback;
-    }
-
     private void playLaunchSound() {
+        // playSound(Player, x, y, z, ...) の正しいシグネチャ: null = 誰も除外しない
         var sound = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("ad_astra", "launch"));
         if (sound != null) {
-            level().playSound(getX(), getY(), getZ(), sound, SoundSource.AMBIENT, 2f, 0.5f, false);
+            level().playSound(null, getX(), getY(), getZ(), sound, SoundSource.AMBIENT, 2f, 0.5f);
         } else {
-            level().playSound(getX(), getY(), getZ(),
-                    SoundEvents.FIREWORK_ROCKET_LAUNCH, SoundSource.AMBIENT, 2f, 0.5f, false);
+            level().playSound(null, getX(), getY(), getZ(),
+                    SoundEvents.FIREWORK_ROCKET_LAUNCH, SoundSource.AMBIENT, 2f, 0.5f);
         }
     }
 
     private void serverTick() {
-        // Collision with other rockets
         List<CargoRocketEntity> intersecting = level().getEntitiesOfClass(
                 CargoRocketEntity.class, new AABB(blockPosition()).inflate(2), e -> e.isAlive() && e.getId() != getId());
         if (!intersecting.isEmpty()) {
             level().explode(this, getX(), getY() + 2, getZ(), 5, Level.ExplosionInteraction.MOB);
             dropInventory(); dropSelf(); kill(); return;
         }
-
-        if (targetPlanet.isEmpty()) {
-            descentTick();
-        } else {
-            ascentTick();
-        }
+        if (targetPlanet.isEmpty()) { descentTick(); } else { ascentTick(); }
     }
 
     private void descentTick() {
         setLaunchTicks(0);
-
         List<CargoRocketEntity> below = level().getEntitiesOfClass(
                 CargoRocketEntity.class, new AABB(blockPosition().below(3)).inflate(2),
                 e -> e.isAlive() && e.getId() != getId());
@@ -229,15 +204,14 @@ public class CargoRocketEntity extends Entity {
         }
 
         Integer highestBlockY = null;
-        int currentY = blockPosition().getY();
+        int cy = blockPosition().getY();
         outer:
-        for (int y = currentY; y > currentY - 30; y--) {
+        for (int y = cy; y > cy - 30; y--) {
             for (int x = -1; x <= 1; x++) {
                 for (int z = -1; z <= 1; z++) {
                     BlockPos check = new BlockPos(blockPosition().getX() + x, y, blockPosition().getZ() + z);
                     if (!level().getBlockState(check).getCollisionShape(level(), check).isEmpty()) {
-                        highestBlockY = y;
-                        break outer;
+                        highestBlockY = y; break outer;
                     }
                 }
             }
@@ -246,12 +220,8 @@ public class CargoRocketEntity extends Entity {
         if (highestBlockY != null) {
             double target = highestBlockY + 1.0;
             double dist = getY() - target;
-            if (dist <= 0.1) {
-                setDeltaMovement(0, 0, 0);
-                setPos(getX(), target, getZ());
-            } else {
-                setDeltaMovement(0, -Math.min(1.0, Math.max(0.1, dist * 0.1)), 0);
-            }
+            if (dist <= 0.1) { setDeltaMovement(0, 0, 0); setPos(getX(), target, getZ()); }
+            else { setDeltaMovement(0, -Math.min(1.0, Math.max(0.1, dist * 0.1)), 0); }
         } else {
             setDeltaMovement(0, -1.0, 0);
         }
@@ -269,39 +239,28 @@ public class CargoRocketEntity extends Entity {
             dropInventory(); dropSelf(); kill(); return;
         }
 
-        // Check clear path
         boolean clear = true;
         for (int x = -1; x <= 1 && clear; x++)
             for (int z = -1; z <= 1 && clear; z++)
-                if (!level().getBlockState(blockPosition().offset(x, 4, z)).isAir())
-                    clear = false;
+                if (!level().getBlockState(blockPosition().offset(x, 4, z)).isAir()) clear = false;
 
         if (clear) {
-            if (ticks < 40) {
-                setDeltaMovement((random.nextDouble() - 0.5) * 0.05, 0, (random.nextDouble() - 0.5) * 0.05);
-            } else {
-                setDeltaMovement(0, Math.min(1.0, (ticks - 40) * 0.01), 0);
-            }
+            if (ticks < 40) setDeltaMovement((random.nextDouble() - 0.5) * 0.05, 0, (random.nextDouble() - 0.5) * 0.05);
+            else setDeltaMovement(0, Math.min(1.0, (ticks - 40) * 0.01), 0);
         } else {
             setDeltaMovement(0, 0, 0);
         }
 
-        if (getY() > level().getMaxBuildHeight() + 400) {
-            dimensionTransfer();
-        }
+        if (getY() > level().getMaxBuildHeight() + 400) dimensionTransfer();
     }
 
     private void dimensionTransfer() {
         ServerLevel targetWorld = null;
         for (var world : Objects.requireNonNull(level().getServer()).getAllLevels()) {
-            if (world.dimension().location().toString().equals(targetPlanet)) {
-                targetWorld = world;
-                break;
-            }
+            if (world.dimension().location().toString().equals(targetPlanet)) { targetWorld = world; break; }
         }
         targetPlanet = "";
         if (targetWorld == null || targetWorld.equals(level())) return;
-
         Entity spawned = getType().create(targetWorld);
         if (spawned != null) {
             spawned.restoreFrom(this);

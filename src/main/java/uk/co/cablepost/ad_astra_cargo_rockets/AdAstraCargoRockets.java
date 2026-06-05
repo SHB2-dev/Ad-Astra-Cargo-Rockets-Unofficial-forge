@@ -1,6 +1,5 @@
 package uk.co.cablepost.ad_astra_cargo_rockets;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -10,23 +9,19 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketEntity;
-import uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadBlockEntity;
 import uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadInit;
 
 @Mod(AdAstraCargoRockets.MOD_ID)
 public class AdAstraCargoRockets {
     public static final String MOD_ID = "ad_astra_cargo_rockets";
 
-    // --- Deferred Registers ---
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, MOD_ID);
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
@@ -36,7 +31,6 @@ public class AdAstraCargoRockets {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
             DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, MOD_ID);
 
-    // --- Items ---
     public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_1_ITEM =
             ITEMS.register("cargo_rocket_tier_1", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 1));
     public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_2_ITEM =
@@ -46,17 +40,14 @@ public class AdAstraCargoRockets {
     public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_4_ITEM =
             ITEMS.register("cargo_rocket_tier_4", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 4));
 
-    // --- Entity ---
     public static final RegistryObject<EntityType<CargoRocketEntity>> CARGO_ROCKET_ENTITY =
             ENTITY_TYPES.register("cargo_rocket", () ->
                 EntityType.Builder.<CargoRocketEntity>of(CargoRocketEntity::new, MobCategory.MISC)
                     .sized(1.5f, 5.5f)
                     .build(MOD_ID + ":cargo_rocket"));
 
-    // --- Launch Pad ---
     public static final LaunchPadInit LAUNCH_PAD = new LaunchPadInit();
 
-    // --- Creative Tab ---
     public static final RegistryObject<CreativeModeTab> ITEM_GROUP =
             CREATIVE_TABS.register("main_creative_inventory_tab", () ->
                 CreativeModeTab.builder()
@@ -81,14 +72,11 @@ public class AdAstraCargoRockets {
     }
 
     private void setup(FMLCommonSetupEvent event) {
-        // Register CC:Tweaked peripheral provider if present
         event.enqueueWork(() -> {
             try {
                 Class.forName("dan200.computercraft.api.peripheral.IPeripheral");
                 uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadPeripheralForgeCompat.regPer();
-            } catch (ClassNotFoundException ignored) {
-                // CC:Tweaked not installed
-            }
+            } catch (ClassNotFoundException ignored) {}
         });
     }
 
