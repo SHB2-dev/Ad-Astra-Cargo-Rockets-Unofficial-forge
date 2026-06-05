@@ -1,12 +1,11 @@
-This is my first time mod making.
-This mod may cause many bug, and maybe i can't treat almost bugs. sorry. by Chiya
+I've launched a website that automates code generation!
+https://shb2-dev.github.io/cargo_rocket_generator/
 
+I'm new to modding. This mod may contain many bugs. I would really appreciate it if you could submit a pull request.
 
+This mod adds cargo rockets to *Ad Astra* and, when used in conjunction with *CC:tweaked*, allows for the automation of interplanetary item transport.
 
----
-This mod adds cargo rockets to Ad Astra and, when used with CC:tweaked, allows you to automate the transport of items between planets.
-
-# Features added in this fork
+# Added Features
 ## Added particle and sound, and rework launch/landing animation
 Use ad astra's sound and particle to expression
 <br>It can now take off and land more smoothly than before.
