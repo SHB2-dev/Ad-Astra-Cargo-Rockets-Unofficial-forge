@@ -1,8 +1,12 @@
-Place cc-tweaked-1.20.1-forge-api-1.116.0.jar in this folder to enable CC:Tweaked support.
+CC:Tweaked のビルド手順:
 
-Download from one of:
-  - CurseForge: https://www.curseforge.com/minecraft/mc-mods/cc-tweaked/files
-  - Modrinth:   https://modrinth.com/mod/cc-tweaked/versions
+1. CC:Tweaked の通常の mod JAR を入手する
+   - CurseForge: https://www.curseforge.com/minecraft/mc-mods/cc-tweaked/files
+   - Modrinth:   https://modrinth.com/mod/cc-tweaked/versions
+   ファイル名例: cc-tweaked-1.20.1-forge-1.116.0.jar
 
-The file you need is the "forge-api" JAR (not the full mod JAR).
-After placing the JAR here, run: ./gradlew build
+2. この libs/ フォルダに置く
+
+3. ビルドする: ./gradlew build
+
+通常の mod JAR をそのまま compileOnly で参照できます。
