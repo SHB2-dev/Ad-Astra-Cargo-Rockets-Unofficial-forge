@@ -13,31 +13,29 @@ public class LaunchPadMenu extends AbstractContainerMenu {
     @Nullable
     private final LaunchPadBlockEntity blockEntity;
 
-    /** Network constructor */
     public LaunchPadMenu(int syncId, Inventory playerInventory, @Nullable LaunchPadBlockEntity blockEntity) {
         super(AdAstraCargoRockets.LAUNCH_PAD.getMenuType().get(), syncId);
         this.blockEntity = blockEntity;
 
         if (blockEntity != null) {
-            // 9 input slots (row 0-1)
+            // 入力スロット 9個 (y=28)
             for (int i = 0; i < 9; i++) {
-                int col = i % 9, row = i / 9;
-                addSlot(new Slot(blockEntity, i, 8 + col * 18, 18 + row * 18));
+                addSlot(new Slot(blockEntity, i, 9 + i * 18, 29));
             }
-            // 9 output slots
+            // 出力スロット 9個 (y=62)
             for (int i = 0; i < 9; i++) {
-                int col = i % 9, row = i / 9;
-                addSlot(new Slot(blockEntity, 9 + i, 8 + col * 18, 54 + row * 18));
+                addSlot(new Slot(blockEntity, 9 + i, 9 + i * 18, 63));
             }
         }
 
-        // Player inventory
+        // プレイヤーインベントリ 3行 (y=97)
         for (int row = 0; row < 3; row++)
             for (int col = 0; col < 9; col++)
-                addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 84 + row * 18 + (blockEntity != null ? 36 : 0)));
-        // Player hotbar
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, 9 + col * 18, 98 + row * 18));
+
+        // ホットバー (y=170)
         for (int col = 0; col < 9; col++)
-            addSlot(new Slot(playerInventory, col, 8 + col * 18, 142 + (blockEntity != null ? 36 : 0)));
+            addSlot(new Slot(playerInventory, col, 9 + col * 18, 170));
     }
 
     @Override
@@ -47,6 +45,24 @@ public class LaunchPadMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        return ItemStack.EMPTY;
+        ItemStack result = ItemStack.EMPTY;
+        Slot slot = this.slots.get(index);
+        if (slot.hasItem()) {
+            ItemStack stack = slot.getItem();
+            result = stack.copy();
+            int containerSize = blockEntity != null ? 18 : 0;
+            if (index < containerSize) {
+                // コンテナ→プレイヤー
+                if (!moveItemStackTo(stack, containerSize, this.slots.size(), true))
+                    return ItemStack.EMPTY;
+            } else {
+                // プレイヤー→入力スロット
+                if (!moveItemStackTo(stack, 0, 9, false))
+                    return ItemStack.EMPTY;
+            }
+            if (stack.isEmpty()) slot.set(ItemStack.EMPTY);
+            else slot.setChanged();
+        }
+        return result;
     }
 }
