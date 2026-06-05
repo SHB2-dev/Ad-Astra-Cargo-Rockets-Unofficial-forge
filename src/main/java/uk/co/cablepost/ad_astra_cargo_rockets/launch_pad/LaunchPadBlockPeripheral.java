@@ -26,44 +26,35 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
         this.blockEntity = (LaunchPadBlockEntity) blockEntity;
     }
 
-    @Override
-    public void attach(IComputerAccess computer) { blockEntity.addComputer(computer); }
-    @Override
-    public void detach(IComputerAccess computer) { blockEntity.removeComputer(computer); }
-    @Override
-    public String getType() { return "cargo_rocket_launch_pad"; }
-    @Override
-    public boolean equals(IPeripheral other) { return other instanceof LaunchPadBlockPeripheral; }
+    @Override public void attach(IComputerAccess computer) { blockEntity.addComputer(computer); }
+    @Override public void detach(IComputerAccess computer) { blockEntity.removeComputer(computer); }
+    @Override public String getType() { return "cargo_rocket_launch_pad"; }
+    @Override public boolean equals(IPeripheral other) { return other instanceof LaunchPadBlockPeripheral; }
 
     @LuaFunction(mainThread = true)
     public final void launch(String planet) throws LuaException {
         @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
         @Nullable LaunchFailReason reason = blockEntity.launch(planet);
-
         if (reason == null) {
             if (rocket != null) {
-                var level = rocket.level();
                 var sound = ForgeRegistries.SOUND_EVENTS.getValue(
                         new net.minecraft.resources.ResourceLocation("ad_astra", "launch"));
-                if (sound != null) {
-                    level.playSound(null, rocket.blockPosition(), sound, SoundSource.NEUTRAL, 1f, 1f);
-                } else {
-                    level.playSound(null, rocket.blockPosition(),
+                if (sound != null)
+                    rocket.level().playSound(null, rocket.getX(), rocket.getY(), rocket.getZ(),
+                            sound, SoundSource.NEUTRAL, 1f, 1f);
+                else
+                    rocket.level().playSound(null, rocket.getX(), rocket.getY(), rocket.getZ(),
                             SoundEvents.FIREWORK_ROCKET_LAUNCH, SoundSource.NEUTRAL, 1f, 1f);
-                }
             }
             return;
         }
-
         switch (reason) {
             case NO_ROCKET -> throw new LuaException("No rocket found");
             case INVALID_PLANET -> throw new LuaException(planet + " is not a valid planet");
             case NOT_ENOUGH_ENERGY -> throw new LuaException("Not enough energy to launch");
             case NOT_ENOUGH_FUEL -> throw new LuaException("Not enough fuel to launch.");
-            case ROCKET_TIER_TOO_LOW -> {
-                int diff = blockEntity.calculateDifficulty(planet);
-                throw new LuaException(planet + " requires a Tier " + diff + " rocket");
-            }
+            case ROCKET_TIER_TOO_LOW -> throw new LuaException(
+                    planet + " requires a Tier " + blockEntity.calculateDifficulty(planet) + " rocket");
         }
     }
 
@@ -109,14 +100,12 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
         Map<Integer, Map<String, ?>> result = new HashMap<>();
         for (int i = 0; i < blockEntity.getContainerSize(); i++) {
             var stack = blockEntity.getStack(i);
-            if (!stack.isEmpty()) {
-                result.put(i + 1, Map.of(
-                    "name", stack.getHoverName().getString(),
-                    "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
-                    "count", stack.getCount(),
-                    "max_count", stack.getMaxStackSize()
-                ));
-            }
+            if (!stack.isEmpty()) result.put(i + 1, Map.of(
+                "name", stack.getHoverName().getString(),
+                "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
+                "count", stack.getCount(),
+                "max_count", stack.getMaxStackSize()
+            ));
         }
         return result;
     }
@@ -136,7 +125,7 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     }
 
     @LuaFunction(mainThread = true)
-    public Boolean isRocketPresent() { return blockEntity.getRocket() != null; }
+    public boolean isRocketPresent() { return blockEntity.getRocket() != null; }
 
     @LuaFunction(mainThread = true)
     public @Nullable Map<Integer, Map<String, ?>> listRocketInventory() {
@@ -145,14 +134,12 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
         Map<Integer, Map<String, ?>> result = new HashMap<>();
         for (int i = 0; i < rocket.getInventory().getContainerSize(); i++) {
             var stack = rocket.getInventory().getItem(i);
-            if (!stack.isEmpty()) {
-                result.put(i + 1, Map.of(
-                    "name", stack.getHoverName().getString(),
-                    "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
-                    "count", stack.getCount(),
-                    "max_count", stack.getMaxStackSize()
-                ));
-            }
+            if (!stack.isEmpty()) result.put(i + 1, Map.of(
+                "name", stack.getHoverName().getString(),
+                "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
+                "count", stack.getCount(),
+                "max_count", stack.getMaxStackSize()
+            ));
         }
         return result;
     }
@@ -163,8 +150,7 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     @LuaFunction(mainThread = true)
     public final void loadAllItems(IArguments args) throws LuaException {
         if (blockEntity.getRocket() == null) throw new LuaException("No rocket found");
-        String filter = args.optString(0, null);
-        String filterId = parseItemId(filter);
+        String filterId = parseItemId(args.optString(0, null));
         for (int i = 1; i <= 9; i++) {
             var stack = blockEntity.getStack(i - 1);
             if (stack.isEmpty()) continue;
@@ -183,8 +169,7 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     public final void unloadAllItems(IArguments args) throws LuaException {
         @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
         if (rocket == null) throw new LuaException("No rocket found");
-        String filter = args.optString(0, null);
-        String filterId = parseItemId(filter);
+        String filterId = parseItemId(args.optString(0, null));
         for (int i = 1; i <= rocket.getInventory().getContainerSize(); i++) {
             var stack = rocket.getInventory().getItem(i - 1);
             if (stack.isEmpty()) continue;
@@ -202,9 +187,10 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
         }
     }
 
-    private static @Nullable String parseItemId(@Nullable String filter) {
+    @Nullable
+    private static String parseItemId(@Nullable String filter) {
         if (filter == null || filter.isEmpty()) return null;
-        int bracket = filter.indexOf('[');
-        return bracket >= 0 ? filter.substring(0, bracket) : filter;
+        int b = filter.indexOf('[');
+        return b >= 0 ? filter.substring(0, b) : filter;
     }
 }
