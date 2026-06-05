@@ -178,6 +178,8 @@ Returns the current non-empty inventory of the rocket.
 
 ---
 ## Credit
-Fork Source: Ad Astra Cargo Rockets by BillBodkin
+Fork Source: Ad-Astra-Cargo-Rockets-Unofficial by ChiyahaRe 
+URL: https://github.com/ChiyahaRe/Ad-Astra-Cargo-Rockets-Unofficial
+fork of the original fork Source: Ad Astra Cargo Rockets by BillBodkin
 URL: https://modrinth.com/mod/ad-astra-cargo-rockets
 
