@@ -1,48 +1,52 @@
 package uk.co.cablepost.ad_astra_cargo_rockets.launch_pad;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.client.model.*;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.model.Model;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.*;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
+import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 
-@Environment(value= EnvType.CLIENT)
 public class LaunchPadModel extends Model {
+
+    public static final ModelLayerLocation LAYER_LOCATION =
+            new ModelLayerLocation(new ResourceLocation(AdAstraCargoRockets.MOD_ID, "launch_pad"), "main");
+
     private final ModelPart base;
-    private final ModelPart mainBody;
-    private final ModelPart topPlatform;
 
     public LaunchPadModel(ModelPart root) {
-        super(RenderLayer::getEntitySolid);
+        super(RenderType::entitySolid);
         this.base = root.getChild("base");
-        this.mainBody = this.base.getChild("main_body");
-        this.topPlatform = this.base.getChild("top_platform");
     }
 
-    public static TexturedModelData getTexturedModelData() {
-        ModelData modelData = new ModelData();
-        ModelPartData modelPartData = modelData.getRoot();
+    public static LayerDefinition createBodyLayer() {
+        MeshDefinition mesh = new MeshDefinition();
+        PartDefinition rootPart = mesh.getRoot();
 
-        ModelPartData base = modelPartData.addChild("base", ModelPartBuilder.create(), ModelTransform.pivot(0.0F, 24.0F, 0.0F));
+        PartDefinition base = rootPart.addOrReplaceChild("base",
+                CubeListBuilder.create(), PartPose.offset(0f, 24f, 0f));
 
-        // Main body element (from: [-16, 0, -16], to: [32, 13, 32])
-        // Entity model layout: Right(48x13) Front(48x13) Left(48x13) Back(48x13) Top(48x48) Bottom(48x48)
-        base.addChild("main_body", ModelPartBuilder.create()
-                .uv(0, 0).cuboid(-16.0F, -24.0F, -16.0F, 48.0F, 13.0F, 48.0F, new Dilation(0.0F)), 
-                ModelTransform.pivot(0.0F, 0.0F, 0.0F));
+        base.addOrReplaceChild("main_body",
+                CubeListBuilder.create().texOffs(0, 0)
+                        .addBox(-16f, -24f, -16f, 48f, 13f, 48f, new CubeDeformation(0f)),
+                PartPose.offset(0f, 0f, 0f));
 
-        // Top platform element (from: [-15, 13, -15], to: [31, 15, 31])
-        // Entity model layout: Right(46x2) Front(46x2) Left(46x2) Back(46x2) Top(46x46) Bottom(46x46)
-        base.addChild("top_platform", ModelPartBuilder.create()
-                .uv(0, 61).cuboid(-15.0F, -11.0F, -15.0F, 46.0F, 2.0F, 46.0F, new Dilation(0.0F)), 
-                ModelTransform.pivot(0.0F, 0.0F, 0.0F));
+        base.addOrReplaceChild("top_platform",
+                CubeListBuilder.create().texOffs(0, 61)
+                        .addBox(-15f, -11f, -15f, 46f, 2f, 46f, new CubeDeformation(0f)),
+                PartPose.offset(0f, 0f, 0f));
 
-        return TexturedModelData.of(modelData, 256, 256);
+        return LayerDefinition.create(mesh, 256, 256);
     }
 
     @Override
-    public void render(MatrixStack matrices, VertexConsumer vertices, int light, int overlay, float red, float green, float blue, float alpha) {
-        this.base.render(matrices, vertices, light, overlay, red, green, blue, alpha);
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer,
+                                int packedLight, int packedOverlay,
+                                float red, float green, float blue, float alpha) {
+        base.render(poseStack, buffer, packedLight, packedOverlay, red, green, blue, alpha);
     }
 }

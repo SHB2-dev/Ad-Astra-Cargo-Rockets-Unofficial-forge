@@ -1,80 +1,74 @@
 package uk.co.cablepost.ad_astra_cargo_rockets;
 
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidConstants;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
-import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleVariantStorage;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.BlockPos;
-import uk.co.cablepost.f_tech.machines.abstract_machine.AbstractMachineBlockEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.fluids.capability.templates.FluidTank;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlockEntity {
 
-    public final SingleVariantStorage<FluidVariant> fluidTank = new SingleVariantStorage<>() {
+    /** 32 buckets = 32000 mB */
+    public static final int FLUID_CAPACITY = 32000;
 
-
+    public final FluidTank fluidTank = new FluidTank(FLUID_CAPACITY) {
         @Override
-        public long insert(FluidVariant variant, long maxAmount, net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext transaction) {
-
-            if (!isResourceAllowed(variant)) {
-                return 0;
-            }
-            return super.insert(variant, maxAmount, transaction);
-        }
-
-
-        private boolean isResourceAllowed(FluidVariant variant) {
-            String fluidId = Registries.FLUID.getId(variant.getFluid()).toString();
+        public boolean isFluidValid(FluidStack stack) {
+            String fluidId = net.minecraftforge.registries.ForgeRegistries.FLUIDS
+                    .getKey(stack.getFluid()).toString();
             return ModConfig.INSTANCE.fuels.containsKey(fluidId);
         }
 
         @Override
-        protected FluidVariant getBlankVariant() {
-            return FluidVariant.blank();
-        }
-
-        @Override
-        protected long getCapacity(FluidVariant variant) {
-            return 32 * FluidConstants.BUCKET;
-        }
-
-        @Override
-        protected void onFinalCommit() {
-            markDirty();
+        protected void onContentsChanged() {
+            setChanged();
         }
     };
 
-    public AbstractFluidMachineBlockEntity(
-            BlockEntityType<?> type,
-            BlockPos pos,
-            BlockState state,
-            int[] inputSlots,
-            int[] outputSlots,
-            int energyStorageCapacity,
-            int energyStorageMaxInsert,
-            int energyStorageMaxExtract,
-            boolean doProcessing
-    ) {
-        super(type, pos, state,
-                inputSlots,
-                outputSlots,
-                energyStorageCapacity,
-                energyStorageMaxInsert,
-                energyStorageMaxExtract,
-                doProcessing);
+    private final LazyOptional<IFluidHandler> fluidHandler = LazyOptional.of(() -> fluidTank);
+
+    public AbstractFluidMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state,
+                                            int[] inputSlots, int[] outputSlots,
+                                            int energyCapacity, int energyMaxInsert,
+                                            int energyMaxExtract, boolean doProcessing) {
+        super(type, pos, state, inputSlots, outputSlots, energyCapacity, energyMaxInsert, energyMaxExtract, doProcessing);
     }
 
     @Override
-    public void writeNbt(NbtCompound tag) {
-        super.writeNbt(tag);
-        tag.putLong("FluidAmount", fluidTank.amount);
+    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+        if (cap == ForgeCapabilities.FLUID_HANDLER) {
+            return fluidHandler.cast();
+        }
+        return super.getCapability(cap, side);
     }
 
     @Override
-    public void readNbt(NbtCompound tag) {
-        super.readNbt(tag);
-        fluidTank.amount = tag.getLong("FluidAmount");
+    public void invalidateCaps() {
+        super.invalidateCaps();
+        fluidHandler.invalidate();
+    }
+
+    @Override
+    public void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        CompoundTag fluidTag = new CompoundTag();
+        fluidTank.writeToNBT(fluidTag);
+        tag.put("FluidContent", fluidTag);
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        if (tag.contains("FluidContent")) {
+            fluidTank.readFromNBT(tag.getCompound("FluidContent"));
+        }
     }
 }

@@ -1,474 +1,314 @@
 package uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.InventoryOwner;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.particle.ParticleEffect;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.ItemScatterer;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.registries.ForgeRegistries;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 
 import java.util.List;
 import java.util.Objects;
 
-public class CargoRocketEntity extends Entity implements InventoryOwner {
+public class CargoRocketEntity extends Entity {
     public String targetPlanet = "";
-    private final SimpleInventory inventory = new SimpleInventory(9);
 
-    private static final TrackedData<Integer> TRACKED_TIER = DataTracker.registerData(CargoRocketEntity.class, TrackedDataHandlerRegistry.INTEGER);
-    private static final TrackedData<Integer> TRACKED_LAUNCH_TICKS = DataTracker.registerData(CargoRocketEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    // SimpleInventory equivalent using a NonNullList
+    private final net.minecraft.core.NonNullList<ItemStack> inventory =
+            net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
+
+    private static final EntityDataAccessor<Integer> TRACKED_TIER =
+            SynchedEntityData.defineId(CargoRocketEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> TRACKED_LAUNCH_TICKS =
+            SynchedEntityData.defineId(CargoRocketEntity.class, EntityDataSerializers.INT);
 
     private boolean hasPlayedLandingSound = false;
 
-    public CargoRocketEntity(EntityType<?> type, World world) {
-        super(type, world);
+    public CargoRocketEntity(EntityType<?> type, Level level) {
+        super(type, level);
     }
 
     @Override
-    protected void initDataTracker() {
-        this.dataTracker.startTracking(TRACKED_TIER, 0);
-        this.dataTracker.startTracking(TRACKED_LAUNCH_TICKS, 0);
+    protected void defineSynchedData() {
+        this.entityData.define(TRACKED_TIER, 0);
+        this.entityData.define(TRACKED_LAUNCH_TICKS, 0);
     }
 
     @Override
-    public void readCustomDataFromNbt(NbtCompound nbt) {
-        dataTracker.set(TRACKED_TIER, nbt.getInt("Tier"));
-        dataTracker.set(TRACKED_LAUNCH_TICKS, nbt.getInt("LaunchTicks"));
-
+    public void readAdditionalSaveData(CompoundTag nbt) {
+        entityData.set(TRACKED_TIER, nbt.getInt("Tier"));
+        entityData.set(TRACKED_LAUNCH_TICKS, nbt.getInt("LaunchTicks"));
         targetPlanet = nbt.getString("TargetPlanet");
-        this.readInventory(nbt);
+        ContainerHelper.loadAllItems(nbt, inventory);
     }
 
     @Override
-    public void writeCustomDataToNbt(NbtCompound nbt) {
-        nbt.putInt("Tier", dataTracker.get(TRACKED_TIER));
-        nbt.putInt("LaunchTicks", dataTracker.get(TRACKED_LAUNCH_TICKS));
+    public void addAdditionalSaveData(CompoundTag nbt) {
+        nbt.putInt("Tier", entityData.get(TRACKED_TIER));
+        nbt.putInt("LaunchTicks", entityData.get(TRACKED_LAUNCH_TICKS));
         nbt.putString("TargetPlanet", targetPlanet);
-        this.writeInventory(nbt);
+        ContainerHelper.saveAllItems(nbt, inventory);
     }
 
-    public void setTier(int tier){
-        dataTracker.set(TRACKED_TIER, tier);
+    public void setTier(int tier) { entityData.set(TRACKED_TIER, tier); }
+    public int getTier() { return entityData.get(TRACKED_TIER); }
+    public void setLaunchTicks(int ticks) { entityData.set(TRACKED_LAUNCH_TICKS, ticks); }
+    public int getLaunchTicks() { return entityData.get(TRACKED_LAUNCH_TICKS); }
+
+    /** Expose inventory as a simple Container for peripheral use */
+    public net.minecraft.world.SimpleContainer getInventory() {
+        // Wrap NonNullList in a SimpleContainer each call is fine for our use
+        net.minecraft.world.SimpleContainer c = new net.minecraft.world.SimpleContainer(9) {
+            @Override public ItemStack getItem(int slot) { return inventory.get(slot); }
+            @Override public void setItem(int slot, ItemStack stack) { inventory.set(slot, stack); }
+            @Override public int getContainerSize() { return 9; }
+        };
+        return c;
     }
 
-    public int getTier(){
-        return dataTracker.get(TRACKED_TIER);
-    }
-
-    public void setLaunchTicks(int ticks) {
-        dataTracker.set(TRACKED_LAUNCH_TICKS, ticks);
-    }
-
-    public int getLaunchTicks() {
-        return dataTracker.get(TRACKED_LAUNCH_TICKS);
-    }
-
-    @Override
-    public SimpleInventory getInventory() {
-        return this.inventory;
-    }
-
-    @Override
-    public boolean canUsePortals(){
-        return false;
-    }
+    @Override public boolean canBeCollidedWith() { return true; }
+    @Override public boolean isPushable() { return false; }
+    @Override public boolean isIgnoringBlockTriggers() { return true; }
 
     @Override
-    public boolean isPushedByFluids() {
-        return false;
-    }
-
-    @Override
-    public boolean collidesWith(Entity other) {
-        return canCollide(this, other);
-    }
-
-    public static boolean canCollide(Entity entity, Entity other) {
-        return other.isCollidable() && !entity.isConnectedThroughVehicle(other);
-    }
-
-    @Override
-    public boolean isCollidable() {
-        return true;
-    }
-
-    @Override
-    public boolean canHit() {
-        return true;
-    }
-
-    @Override
-    public ActionResult interact(PlayerEntity player, Hand hand) {
-        if(player.getWorld().isClient() || hand == Hand.OFF_HAND){
-            return ActionResult.PASS;
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        if (level().isClientSide || hand == InteractionHand.OFF_HAND) return InteractionResult.PASS;
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(" ====== Ship inventory ======"));
+        for (int i = 0; i < inventory.size(); i++) {
+            var stack = inventory.get(i);
+            if (!stack.isEmpty())
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "Slot " + i + ": " + stack.getCount() + "x " + stack.getDisplayName().getString()));
         }
-
-        player.sendMessage(Text.of(" ====== Ship inventory ======"));// TODO - open inventory GUI
-
-        for(int i = 0; i < getInventory().size(); i++){
-            var stack = getInventory().getStack(i);
-            if(stack.isEmpty()){
-                continue;
-            }
-
-            player.sendMessage(Text.of("Slot " + i + ": " + stack.getCount() + "x ").copy().append(stack.getItem().getName()));
-        }
-
-        player.sendMessage(Text.of(" =========================="));
-
-        return ActionResult.SUCCESS;
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(" =========================="));
+        return InteractionResult.SUCCESS;
     }
 
-    private void dropInventory(){
-        if(getWorld().isClient()){
-            return;
+    private void dropInventory() {
+        if (level().isClientSide) return;
+        for (int i = 0; i < inventory.size(); i++) {
+            spawnAtLocation(inventory.get(i));
+            inventory.set(i, ItemStack.EMPTY);
         }
-
-        ItemScatterer.spawn(getWorld(), this, getInventory());
     }
 
-    private void dropSelf(){
-        if(getWorld().isClient()){
-            return;
-        }
-
+    private void dropSelf() {
+        if (level().isClientSide) return;
         int tier = getTier();
-
-        if(tier == 1) {
-            this.dropItem(AdAstraCargoRockets.CARGO_ROCKET_TIER_1_ITEM);
-            return;
-        }if(tier == 2) {
-            this.dropItem(AdAstraCargoRockets.CARGO_ROCKET_TIER_2_ITEM);
-            return;
-        }if(tier == 3) {
-            this.dropItem(AdAstraCargoRockets.CARGO_ROCKET_TIER_3_ITEM);
-            return;
-        }if(tier == 4) {
-            this.dropItem(AdAstraCargoRockets.CARGO_ROCKET_TIER_4_ITEM);
-            return;
-        }
-
-        this.dropItem(Items.DIRT);
+        if (tier == 1) { spawnAtLocation(new ItemStack(AdAstraCargoRockets.CARGO_ROCKET_TIER_1_ITEM.get())); return; }
+        if (tier == 2) { spawnAtLocation(new ItemStack(AdAstraCargoRockets.CARGO_ROCKET_TIER_2_ITEM.get())); return; }
+        if (tier == 3) { spawnAtLocation(new ItemStack(AdAstraCargoRockets.CARGO_ROCKET_TIER_3_ITEM.get())); return; }
+        if (tier == 4) { spawnAtLocation(new ItemStack(AdAstraCargoRockets.CARGO_ROCKET_TIER_4_ITEM.get())); return; }
+        spawnAtLocation(new ItemStack(Items.DIRT));
     }
 
     @Override
-    public boolean damage(DamageSource source, float amount) {
-        if (this.isInvulnerableTo(source)) {
-            return false;
-        } else if (this.getWorld().isClient) {
-            return true;
-        } else {
-            dropInventory();
-            dropSelf();
-
-            this.kill();
-
-            return true;
-        }
+    public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        if (isInvulnerableTo(source)) return false;
+        if (level().isClientSide) return true;
+        dropInventory();
+        dropSelf();
+        kill();
+        return true;
     }
 
     public void killRocket() {
-        this.damage(this.getDamageSources().genericKill(), Float.MAX_VALUE);
+        hurt(damageSources().genericKill(), Float.MAX_VALUE);
     }
 
     @Override
-    public void tick(){
+    public void tick() {
         super.tick();
+        setPos(getX(), getY() + getDeltaMovement().y, getZ());
 
-        this.setPosition(this.getX(), this.getY() + this.getVelocity().y, this.getZ());
-        this.checkBlockCollision();
-
-        if(getWorld().isClient()){
-            if(this.getVelocity().y < -0.1){
-                boolean groundNearby = false;
-                for(int i = 1; i < 30; i++){
-                    BlockPos checkPos = getBlockPos().add(0, -i, 0);
-                    if(!getWorld().getBlockState(checkPos).getCollisionShape(getWorld(), checkPos).isEmpty()){
-                        groundNearby = true;
-                        break;
-                    }
-                }
-
-                if(groundNearby){
-                    for(int i = 0; i < 3; i++) {
-                        var flame = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "large_flame"));
-                        if (flame instanceof ParticleEffect particleEffect) {
-                            getWorld().addParticle(particleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        } else {
-                            var altFlame = Registries.PARTICLE_TYPE.get(new Identifier("northstar", "rocket_flame"));
-                            if (altFlame instanceof ParticleEffect altParticleEffect) {
-                                getWorld().addParticle(altParticleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                            } else {
-                                getWorld().addParticle(ParticleTypes.FLAME, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                            }
-                        }
-
-                        var smoke = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "large_smoke"));
-                        if (smoke instanceof ParticleEffect particleEffect) {
-                            getWorld().addParticle(particleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        } else {
-                            var altSmoke = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "rocket_smoke"));
-                            if (altSmoke instanceof ParticleEffect altParticleEffect) {
-                                getWorld().addParticle(altParticleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                            } else {
-                                getWorld().addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                            }
-                        }
-                    }
-
-                    if(!hasPlayedLandingSound){
-                        hasPlayedLandingSound = true;
-                        var sound = Registries.SOUND_EVENT.get(new Identifier("ad_astra", "launch"));
-                        if(sound != null) {
-                            getWorld().playSound(getX(), getY(), getZ(), sound, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                        } else {
-                            var alternativeSound = Registries.SOUND_EVENT.get(new Identifier("northstar", "rocket_landing"));
-                            if (alternativeSound != null) {
-                                getWorld().playSound(getX(), getY(), getZ(), alternativeSound, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                            } else {
-                                getWorld().playSound(getX(), getY(), getZ(), SoundEvents.ENTITY_FIREWORK_ROCKET_LAUNCH, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                            }
-                        }
-                    }
-                } else {
-                    hasPlayedLandingSound = false;
-                }
-            } else if (getLaunchTicks() > 0) {
-                // Launch particles
-                 for(int i = 0; i < 3; i++) {
-                    var flame = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "large_flame"));
-                    if (flame instanceof ParticleEffect particleEffect) {
-                        getWorld().addParticle(particleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                    } else {
-                        var altFlame = Registries.PARTICLE_TYPE.get(new Identifier("northstar", "rocket_flame"));
-                        if (altFlame instanceof ParticleEffect altParticleEffect) {
-                            getWorld().addParticle(altParticleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        } else {
-                            getWorld().addParticle(ParticleTypes.FLAME, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        }
-                    }
-
-                    var smoke = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "large_smoke"));
-                    if (smoke instanceof ParticleEffect particleEffect) {
-                        getWorld().addParticle(particleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                    } else {
-                        var altSmoke = Registries.PARTICLE_TYPE.get(new Identifier("ad_astra", "rocket_smoke"));
-                        if (altSmoke instanceof ParticleEffect altParticleEffect) {
-                            getWorld().addParticle(altParticleEffect, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        } else {
-                            getWorld().addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, true, getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
-                        }
-                    }
-                }
-
-                int ticks = getLaunchTicks();
-                if (ticks == 1 || ticks == 40) {
-                     var sound = Registries.SOUND_EVENT.get(new Identifier("ad_astra", "launch"));
-                     if(sound != null) {
-                         getWorld().playSound(getX(), getY(), getZ(), sound, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                     } else {
-                         var alternativeSound = Registries.SOUND_EVENT.get(new Identifier("northstar", "rocket_takeoff"));
-                         if (alternativeSound != null) {
-                             getWorld().playSound(getX(), getY(), getZ(), alternativeSound, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                         } else {
-                             getWorld().playSound(getX(), getY(), getZ(), SoundEvents.ENTITY_FIREWORK_ROCKET_LAUNCH, SoundCategory.AMBIENT, 2f, 0.5f, false);
-                         }
-                     }
-                }
-
-                hasPlayedLandingSound = false;
-            } else {
-                hasPlayedLandingSound = false;
-            }
+        if (level().isClientSide) {
+            clientTick();
             return;
         }
+        serverTick();
+    }
 
-        {
-            List<CargoRocketEntity> allCargoRocketEntitiesIntersecting = getWorld().getEntitiesByClass(CargoRocketEntity.class, new Box(getBlockPos()).expand(2), CargoRocketEntity::isAlive).stream().filter(x -> x.getId() != getId()).toList();
-
-            if(!allCargoRocketEntitiesIntersecting.isEmpty()){
-                getWorld().createExplosion(
-                    this,
-                    getX(),
-                    getY() + 2,
-                    getZ(),
-                    5,
-                    World.ExplosionSourceType.MOB
-                );
-
-                dropInventory();
-                dropSelf();
-
-                this.kill();
-            }
-        }
-
-        if(targetPlanet.isEmpty()){
-            setLaunchTicks(0);
-            
-            // Descent Logic
-            List<CargoRocketEntity> allCargoRocketEntitiesBelow = getWorld().getEntitiesByClass(CargoRocketEntity.class, new Box(getBlockPos().add(0, -3, 0)).expand(2), CargoRocketEntity::isAlive).stream().filter(x -> x.getId() != getId()).toList();
-
-            if(!allCargoRocketEntitiesBelow.isEmpty()){
-                getWorld().createExplosion(
-                    this,
-                    getX(),
-                    getY() - 0.5f,
-                    getZ(),
-                    5,
-                    World.ExplosionSourceType.MOB
-                );
-
-                dropInventory();
-                dropSelf();
-
-                this.kill();
-                return;
-            }
-
-            // Find ground level
-            Integer highestBlockY = null;
-            int currentBlockY = getBlockPos().getY();
-            // Scan down to find the highest block in 3x3 area
-            for (int y = currentBlockY; y > currentBlockY - 30; y--) {
-                boolean isBlocked = false;
-                for (int x = -1; x <= 1; x++) {
-                    for (int z = -1; z <= 1; z++) {
-                         BlockPos checkPos = new BlockPos(getBlockPos().getX() + x, y, getBlockPos().getZ() + z);
-                         if (!getWorld().getBlockState(checkPos).getCollisionShape(getWorld(), checkPos).isEmpty()) {
-                             isBlocked = true;
-                             break;
-                         }
-                    }
-                    if(isBlocked) break;
-                }
-
-                if (isBlocked) {
-                    highestBlockY = y;
+    private void clientTick() {
+        double velY = getDeltaMovement().y;
+        if (velY < -0.1) {
+            boolean groundNearby = false;
+            for (int i = 1; i < 30; i++) {
+                BlockPos check = blockPosition().below(i);
+                if (!level().getBlockState(check).getCollisionShape(level(), check).isEmpty()) {
+                    groundNearby = true;
                     break;
                 }
             }
-
-            if (highestBlockY != null) {
-                double targetY = highestBlockY + 1.0d;
-                double currentY = getY();
-                double dist = currentY - targetY;
-
-                if (dist <= 0.1) {
-                    // Landed
-                    this.setVelocity(0f, 0f, 0f);
-                    this.setPosition(getX(), targetY, getZ());
-                } else {
-                    // Smooth descent
-                    // Slow down as we get closer. 
-                    // Max speed -1.0, Min speed -0.1
-                    double speed = -Math.min(1.0, Math.max(0.1, dist * 0.1));
-                    this.setVelocity(0f, speed, 0f);
+            if (groundNearby) {
+                spawnFlameParticles();
+                if (!hasPlayedLandingSound) {
+                    hasPlayedLandingSound = true;
+                    playLaunchSound();
                 }
             } else {
-                // No ground nearby, fall fast
-                this.setVelocity(0f, -1f, 0f);
+                hasPlayedLandingSound = false;
             }
+        } else if (getLaunchTicks() > 0) {
+            spawnFlameParticles();
+            int ticks = getLaunchTicks();
+            if (ticks == 1 || ticks == 40) playLaunchSound();
+            hasPlayedLandingSound = false;
+        } else {
+            hasPlayedLandingSound = false;
         }
-        else{
-            // Ascent Logic
-            int launchTicks = getLaunchTicks();
-            setLaunchTicks(launchTicks + 1);
-            
-            List<CargoRocketEntity> allCargoRocketEntitiesAbove = getWorld().getEntitiesByClass(CargoRocketEntity.class, new Box(getBlockPos().add(0, +4, 0)).expand(2), CargoRocketEntity::isAlive).stream().filter(x -> x.getId() != getId()).toList();
+    }
 
-            if(!allCargoRocketEntitiesAbove.isEmpty()){
-                getWorld().createExplosion(
-                    this,
-                    getX(),
-                    getY() - 4f,
-                    getZ(),
-                    5,
-                    World.ExplosionSourceType.MOB
-                );
+    private void spawnFlameParticles() {
+        for (int i = 0; i < 3; i++) {
+            level().addParticle(getParticleOrDefault("ad_astra:large_flame", ParticleTypes.FLAME), true,
+                    getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
+            level().addParticle(getParticleOrDefault("ad_astra:large_smoke", ParticleTypes.CAMPFIRE_COSY_SMOKE), true,
+                    getX() + (random.nextDouble() - 0.5), getY(), getZ() + (random.nextDouble() - 0.5), 0, -0.2, 0);
+        }
+    }
 
-                dropInventory();
-                dropSelf();
+    private net.minecraft.core.particles.ParticleOptions getParticleOrDefault(
+            String id, net.minecraft.core.particles.ParticleOptions fallback) {
+        var pt = ForgeRegistries.PARTICLE_TYPES.getValue(new ResourceLocation(id));
+        return (pt instanceof net.minecraft.core.particles.ParticleOptions po) ? po : fallback;
+    }
 
-                this.kill();
-            }
+    private void playLaunchSound() {
+        var sound = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation("ad_astra", "launch"));
+        if (sound != null) {
+            level().playSound(getX(), getY(), getZ(), sound, SoundSource.AMBIENT, 2f, 0.5f, false);
+        } else {
+            level().playSound(getX(), getY(), getZ(),
+                    SoundEvents.FIREWORK_ROCKET_LAUNCH, SoundSource.AMBIENT, 2f, 0.5f, false);
+        }
+    }
 
-            if(
-                getWorld().getBlockState(getBlockPos().add(-1, 4, -1)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(-1, 4, 0)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(-1, 4, 1)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(0, 4, -1)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(0, 4, 0)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(0, 4, 1)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(1, 4, -1)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(1, 4, 0)).isAir() &&
-                getWorld().getBlockState(getBlockPos().add(1, 4, 1)).isAir()
-            ) {
-                if (launchTicks < 40) {
-                    // Pre-launch
-                    this.setVelocity((random.nextDouble() - 0.5) * 0.05, 0f, (random.nextDouble() - 0.5) * 0.05);
-                } else {
-                    // Accelerate
-                    double speed = Math.min(1.0, (launchTicks - 40) * 0.01);
-                    this.setVelocity(0f, speed, 0f);
-                }
-            }
-            else{
-                this.setVelocity(0f, 0f, 0f);
-            }
+    private void serverTick() {
+        // Collision with other rockets
+        List<CargoRocketEntity> intersecting = level().getEntitiesOfClass(
+                CargoRocketEntity.class, new AABB(blockPosition()).inflate(2), e -> e.isAlive() && e.getId() != getId());
+        if (!intersecting.isEmpty()) {
+            level().explode(this, getX(), getY() + 2, getZ(), 5, Level.ExplosionInteraction.MOB);
+            dropInventory(); dropSelf(); kill(); return;
+        }
 
-            if(getPos().y > getWorld().getTopY() + 400){
-                ServerWorld targetWorld = null;
+        if (targetPlanet.isEmpty()) {
+            descentTick();
+        } else {
+            ascentTick();
+        }
+    }
 
-                var worlds = Objects.requireNonNull(getWorld().getServer()).getWorlds();
-                for(var otherWorld : worlds){
-                    if(otherWorld.getRegistryKey().getValue().toString().equals(targetPlanet)){
-                        targetWorld = otherWorld;
-                        break;
+    private void descentTick() {
+        setLaunchTicks(0);
+
+        List<CargoRocketEntity> below = level().getEntitiesOfClass(
+                CargoRocketEntity.class, new AABB(blockPosition().below(3)).inflate(2),
+                e -> e.isAlive() && e.getId() != getId());
+        if (!below.isEmpty()) {
+            level().explode(this, getX(), getY() - 0.5, getZ(), 5, Level.ExplosionInteraction.MOB);
+            dropInventory(); dropSelf(); kill(); return;
+        }
+
+        Integer highestBlockY = null;
+        int currentY = blockPosition().getY();
+        outer:
+        for (int y = currentY; y > currentY - 30; y--) {
+            for (int x = -1; x <= 1; x++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos check = new BlockPos(blockPosition().getX() + x, y, blockPosition().getZ() + z);
+                    if (!level().getBlockState(check).getCollisionShape(level(), check).isEmpty()) {
+                        highestBlockY = y;
+                        break outer;
                     }
                 }
-
-                targetPlanet = "";
-
-                if(targetWorld == null || targetWorld.equals(getWorld())){
-                    return;
-                }
-
-                detach();
-
-                Entity entity = this.getType().create(targetWorld);
-                if (entity != null) {
-                    entity.copyFrom(this);
-                    entity.refreshPositionAndAngles(getX(), targetWorld.getTopY() + 200, getZ(), 0, 0);
-                    entity.setVelocity(new Vec3d(0, 0, 0));
-                    targetWorld.onDimensionChanged(entity);
-                }
-
-                removeFromDimension();
-
-                ((ServerWorld)this.getWorld()).resetIdleTimeout();
-                targetWorld.resetIdleTimeout();
             }
         }
+
+        if (highestBlockY != null) {
+            double target = highestBlockY + 1.0;
+            double dist = getY() - target;
+            if (dist <= 0.1) {
+                setDeltaMovement(0, 0, 0);
+                setPos(getX(), target, getZ());
+            } else {
+                setDeltaMovement(0, -Math.min(1.0, Math.max(0.1, dist * 0.1)), 0);
+            }
+        } else {
+            setDeltaMovement(0, -1.0, 0);
+        }
+    }
+
+    private void ascentTick() {
+        int ticks = getLaunchTicks();
+        setLaunchTicks(ticks + 1);
+
+        List<CargoRocketEntity> above = level().getEntitiesOfClass(
+                CargoRocketEntity.class, new AABB(blockPosition().above(4)).inflate(2),
+                e -> e.isAlive() && e.getId() != getId());
+        if (!above.isEmpty()) {
+            level().explode(this, getX(), getY() - 4, getZ(), 5, Level.ExplosionInteraction.MOB);
+            dropInventory(); dropSelf(); kill(); return;
+        }
+
+        // Check clear path
+        boolean clear = true;
+        for (int x = -1; x <= 1 && clear; x++)
+            for (int z = -1; z <= 1 && clear; z++)
+                if (!level().getBlockState(blockPosition().offset(x, 4, z)).isAir())
+                    clear = false;
+
+        if (clear) {
+            if (ticks < 40) {
+                setDeltaMovement((random.nextDouble() - 0.5) * 0.05, 0, (random.nextDouble() - 0.5) * 0.05);
+            } else {
+                setDeltaMovement(0, Math.min(1.0, (ticks - 40) * 0.01), 0);
+            }
+        } else {
+            setDeltaMovement(0, 0, 0);
+        }
+
+        if (getY() > level().getMaxBuildHeight() + 400) {
+            dimensionTransfer();
+        }
+    }
+
+    private void dimensionTransfer() {
+        ServerLevel targetWorld = null;
+        for (var world : Objects.requireNonNull(level().getServer()).getAllLevels()) {
+            if (world.dimension().location().toString().equals(targetPlanet)) {
+                targetWorld = world;
+                break;
+            }
+        }
+        targetPlanet = "";
+        if (targetWorld == null || targetWorld.equals(level())) return;
+
+        Entity spawned = getType().create(targetWorld);
+        if (spawned != null) {
+            spawned.restoreFrom(this);
+            spawned.moveTo(getX(), targetWorld.getMaxBuildHeight() + 200, getZ(), 0, 0);
+            spawned.setDeltaMovement(Vec3.ZERO);
+            targetWorld.addFreshEntity(spawned);
+        }
+        discard();
     }
 }

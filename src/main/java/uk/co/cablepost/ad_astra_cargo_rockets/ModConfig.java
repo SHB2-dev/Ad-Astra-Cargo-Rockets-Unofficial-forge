@@ -2,7 +2,7 @@ package uk.co.cablepost.ad_astra_cargo_rockets;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.File;
 import java.io.FileReader;
@@ -13,7 +13,8 @@ import java.util.Map;
 
 public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final File CONFIG_FILE = new File(FabricLoader.getInstance().getConfigDir().toFile(), "ad_astra_cargo_rockets.json");
+    private static final File CONFIG_FILE = FMLPaths.CONFIGDIR.get()
+            .resolve("ad_astra_cargo_rockets.json").toFile();
 
     public static ConfigData INSTANCE = new ConfigData();
 
@@ -22,7 +23,6 @@ public class ModConfig {
         public Map<String, Double> fuels = new HashMap<>();
 
         public ConfigData() {
-            // Default Destinations
             validDestinations.put("minecraft:overworld", 0);
             validDestinations.put("ad_astra:earth_orbit", 1);
             validDestinations.put("ad_astra:moon", 1);
@@ -36,8 +36,6 @@ public class ModConfig {
             validDestinations.put("ad_astra:glacio", 4);
             validDestinations.put("ad_astra:glacio_orbit", 4);
 
-            // Default Fuels (Fuel ID -> Performance Multiplier)
-            // Higher value means less fuel is required to launch.
             fuels.put("ad_astra:fuel", 1.0);
             fuels.put("ad_astra:cryo_fuel", 3.0);
         }

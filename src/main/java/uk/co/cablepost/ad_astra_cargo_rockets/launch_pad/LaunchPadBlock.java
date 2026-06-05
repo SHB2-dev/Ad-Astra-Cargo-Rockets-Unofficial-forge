@@ -1,74 +1,77 @@
 package uk.co.cablepost.ad_astra_cargo_rockets.launch_pad;
 
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraftforge.network.NetworkHooks;
 import org.jetbrains.annotations.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 import uk.co.cablepost.ad_astra_cargo_rockets.CargoRocketItem;
 import uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketEntity;
-import uk.co.cablepost.f_tech.machines.abstract_machine.AbstractMachineBlock;
 
 import java.util.List;
 
-public class LaunchPadBlock extends AbstractMachineBlock {
+public class LaunchPadBlock extends BaseEntityBlock {
 
-    public LaunchPadBlock(Settings settings) {
-        super(
-            settings,
-            -1,
-            1,
-            0,
-            0,
-            -1,
-            1
-        );
+    public LaunchPadBlock(Properties properties) {
+        super(properties);
     }
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.ENTITYBLOCK_ANIMATED;
-    }
-
-    @Override
-    @Nullable
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        return checkType(world, type, AdAstraCargoRockets.LAUNCH_PAD.getBlockEntity());
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.ENTITYBLOCK_ANIMATED;
     }
 
     @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new LaunchPadBlockEntity(pos, state);
     }
 
+    @Nullable
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
-        ItemStack stack = player.getStackInHand(hand);
-        if (!world.isClient && !stack.isEmpty() && stack.getItem() instanceof CargoRocketItem cargoRocketItem) {
-            List<CargoRocketEntity> allCargoRocketEntitiesNearby = world.getEntitiesByClass(CargoRocketEntity.class, new Box(pos).expand(3), CargoRocketEntity::isAlive);
-            if(allCargoRocketEntitiesNearby.isEmpty()) {
-                CargoRocketEntity cargoRocketEntity = AdAstraCargoRockets.CARGO_ROCKET_ENTITY.create(world);
-                assert cargoRocketEntity != null;
-                cargoRocketEntity.refreshPositionAndAngles(pos.toCenterPos().getX(), pos.getY() + 1f, pos.toCenterPos().getZ(), 0.0f, 0.0f);
-                world.spawnEntity(cargoRocketEntity);
-                cargoRocketEntity.setTier(cargoRocketItem.tier);
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        return createTickerHelper(type, AdAstraCargoRockets.LAUNCH_PAD.getBlockEntity().get(),
+                LaunchPadBlockEntity::tick);
+    }
 
-                stack.decrement(1);
-                return ActionResult.CONSUME;
+    @Override
+    public InteractionResult use(BlockState state, Level level, BlockPos pos,
+                                  Player player, InteractionHand hand, BlockHitResult hit) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (!level.isClientSide && !stack.isEmpty() && stack.getItem() instanceof CargoRocketItem cargoRocketItem) {
+            List<CargoRocketEntity> nearby = level.getEntitiesOfClass(
+                    CargoRocketEntity.class, new AABB(pos).inflate(3), CargoRocketEntity::isAlive);
+            if (nearby.isEmpty()) {
+                CargoRocketEntity entity = AdAstraCargoRockets.CARGO_ROCKET_ENTITY.get().create(level);
+                if (entity != null) {
+                    entity.moveTo(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5, 0f, 0f);
+                    level.addFreshEntity(entity);
+                    entity.setTier(cargoRocketItem.tier);
+                    stack.shrink(1);
+                    return InteractionResult.CONSUME;
+                }
             }
         }
 
-        return super.onUse(state, world, pos, player, hand, hit);
+        if (!level.isClientSide) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof LaunchPadBlockEntity launchPad) {
+                NetworkHooks.openScreen((ServerPlayer) player, launchPad, pos);
+            }
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
     }
 }

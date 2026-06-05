@@ -1,122 +1,104 @@
 package uk.co.cablepost.ad_astra_cargo_rockets;
 
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
-import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
-import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
-import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
-import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
-import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
 import uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketEntity;
 import uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadBlockEntity;
 import uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadInit;
-import uk.co.cablepost.f_tech.machines.machine_shell.MachineShellBlockInit;
 
-public class AdAstraCargoRockets implements ModInitializer {
+@Mod(AdAstraCargoRockets.MOD_ID)
+public class AdAstraCargoRockets {
     public static final String MOD_ID = "ad_astra_cargo_rockets";
 
-    public static final CargoRocketItem CARGO_ROCKET_TIER_1_ITEM = new CargoRocketItem(new FabricItemSettings().maxCount(1), 1);
-    public static final CargoRocketItem CARGO_ROCKET_TIER_2_ITEM = new CargoRocketItem(new FabricItemSettings().maxCount(1), 2);
-    public static final CargoRocketItem CARGO_ROCKET_TIER_3_ITEM = new CargoRocketItem(new FabricItemSettings().maxCount(1), 3);
-    public static final CargoRocketItem CARGO_ROCKET_TIER_4_ITEM = new CargoRocketItem(new FabricItemSettings().maxCount(1), 4);
+    // --- Deferred Registers ---
+    public static final DeferredRegister<Item> ITEMS =
+            DeferredRegister.create(ForgeRegistries.ITEMS, MOD_ID);
+    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
+            DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, MOD_ID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
+            DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MOD_ID);
+    public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS =
+            DeferredRegister.create(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, MOD_ID);
 
-    public static final EntityType<CargoRocketEntity> CARGO_ROCKET_ENTITY = Registry.register(
-        Registries.ENTITY_TYPE,
-        new Identifier(MOD_ID, "cargo_rocket"),
-        FabricEntityTypeBuilder.create(SpawnGroup.MISC, CargoRocketEntity::new).dimensions(EntityDimensions.fixed(1.5f, 5.5f)).build()
-    );
+    // --- Items ---
+    public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_1_ITEM =
+            ITEMS.register("cargo_rocket_tier_1", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 1));
+    public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_2_ITEM =
+            ITEMS.register("cargo_rocket_tier_2", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 2));
+    public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_3_ITEM =
+            ITEMS.register("cargo_rocket_tier_3", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 3));
+    public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_4_ITEM =
+            ITEMS.register("cargo_rocket_tier_4", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 4));
 
+    // --- Entity ---
+    public static final RegistryObject<EntityType<CargoRocketEntity>> CARGO_ROCKET_ENTITY =
+            ENTITY_TYPES.register("cargo_rocket", () ->
+                EntityType.Builder.<CargoRocketEntity>of(CargoRocketEntity::new, MobCategory.MISC)
+                    .sized(1.5f, 5.5f)
+                    .build(MOD_ID + ":cargo_rocket"));
+
+    // --- Launch Pad ---
     public static final LaunchPadInit LAUNCH_PAD = new LaunchPadInit();
 
-    public static final ItemGroup ITEM_GROUP = FabricItemGroup.builder()
-        .icon(() -> new ItemStack(LAUNCH_PAD.getBlock().asItem()))
-        .displayName(Text.translatable("itemGroup.ad_astra_cargo_rockets.items"))
-        .entries((context, entries) -> {
-            entries.add(LAUNCH_PAD.getBlock().asItem());
-            entries.add(CARGO_ROCKET_TIER_1_ITEM);
-            entries.add(CARGO_ROCKET_TIER_2_ITEM);
-            entries.add(CARGO_ROCKET_TIER_3_ITEM);
-            entries.add(CARGO_ROCKET_TIER_4_ITEM);
-        })
-        .build()
-    ;
+    // --- Creative Tab ---
+    public static final RegistryObject<CreativeModeTab> ITEM_GROUP =
+            CREATIVE_TABS.register("main_creative_inventory_tab", () ->
+                CreativeModeTab.builder()
+                    .icon(() -> new ItemStack(LAUNCH_PAD.getBlock().get()))
+                    .title(net.minecraft.network.chat.Component.translatable("itemGroup.ad_astra_cargo_rockets.items"))
+                    .build());
 
-    @Override
-    public void onInitialize() {
+    public AdAstraCargoRockets() {
+        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
+
+        ITEMS.register(bus);
+        ENTITY_TYPES.register(bus);
+        BLOCK_ENTITY_TYPES.register(bus);
+        CREATIVE_TABS.register(bus);
+        LAUNCH_PAD.register(bus);
+
+        bus.addListener(this::setup);
+        bus.addListener(this::buildCreativeTab);
+        bus.addListener(AdAstraCargoRocketsClient::clientSetup);
+
         ModConfig.load();
-
-        Registry.register(Registries.ITEM_GROUP, new Identifier(MOD_ID, "main_creative_inventory_tab"), ITEM_GROUP);
-
-        Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "cargo_rocket_tier_1"), CARGO_ROCKET_TIER_1_ITEM);
-        Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "cargo_rocket_tier_2"), CARGO_ROCKET_TIER_2_ITEM);
-        Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "cargo_rocket_tier_3"), CARGO_ROCKET_TIER_3_ITEM);
-        Registry.register(Registries.ITEM, Identifier.of(MOD_ID, "cargo_rocket_tier_4"), CARGO_ROCKET_TIER_4_ITEM);
-        LAUNCH_PAD.onInitialize();
-
-        FluidStorage.SIDED.registerForBlocks(
-                (world, pos, state, blockEntity, direction) -> {
-
-                    if (blockEntity instanceof LaunchPadBlockEntity launchPad) {
-                        return launchPad.fluidTank;
-                    }
-
-
-                    for (int x = -1; x <= 1; x++) {
-                        for (int z = -1; z <= 1; z++) {
-                            if (x == 0 && z == 0) continue;
-
-                            BlockPos checkPos = pos.add(x, 0, z);
-                            BlockEntity be = world.getBlockEntity(checkPos);
-
-                            if (be instanceof LaunchPadBlockEntity launchPad) {
-                                return launchPad.fluidTank;
-                            }
-                        }
-                    }
-                    return null;
-                },
-                LAUNCH_PAD.getBlock(),
-                MachineShellBlockInit.MACHINE_SHELL_BLOCK
-        );
-
-        ItemStorage.SIDED.registerForBlocks(
-                (world, pos, state, blockEntity, direction) -> {
-
-                    if (blockEntity instanceof LaunchPadBlockEntity launchPad) {
-                        return InventoryStorage.of(launchPad, direction);
-                    }
-
-
-                    for (int x = -1; x <= 1; x++) {
-                        for (int z = -1; z <= 1; z++) {
-                            if (x == 0 && z == 0) continue;
-
-                            BlockPos checkPos = pos.add(x, 0, z);
-                            BlockEntity be = world.getBlockEntity(checkPos);
-
-                            if (be instanceof LaunchPadBlockEntity launchPad) {
-                                return InventoryStorage.of(launchPad, direction);
-                            }
-                        }
-                    }
-                    return null;
-                },
-                LAUNCH_PAD.getBlock(),
-                MachineShellBlockInit.MACHINE_SHELL_BLOCK
-        );
     }
 
+    private void setup(FMLCommonSetupEvent event) {
+        // Register CC:Tweaked peripheral provider if present
+        event.enqueueWork(() -> {
+            try {
+                Class.forName("dan200.computercraft.api.peripheral.IPeripheral");
+                uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadPeripheralForgeCompat.regPer();
+            } catch (ClassNotFoundException ignored) {
+                // CC:Tweaked not installed
+            }
+        });
+    }
+
+    private void buildCreativeTab(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == ITEM_GROUP.getKey()) {
+            event.accept(LAUNCH_PAD.getBlock().get());
+            event.accept(CARGO_ROCKET_TIER_1_ITEM.get());
+            event.accept(CARGO_ROCKET_TIER_2_ITEM.get());
+            event.accept(CARGO_ROCKET_TIER_3_ITEM.get());
+            event.accept(CARGO_ROCKET_TIER_4_ITEM.get());
+        }
+    }
 }

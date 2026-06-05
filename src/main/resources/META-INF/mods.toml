@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="LGPL-3.0"
+
+[[dependencies.ad_astra_cargo_rockets]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47.3,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.ad_astra_cargo_rockets]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[${minecraft_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.ad_astra_cargo_rockets]]
+    modId="computercraft"
+    mandatory=false
+    versionRange="[${cc_tweaked_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[mods]]
+modId="ad_astra_cargo_rockets"
+version="${version}"
+displayName="Ad Astra Cargo Rockets Unofficial"
+description="Adds cargo rockets to Ad Astra."
+logoFile="assets/ad_astra_cargo_rockets/icon.png"
+authors="ChiyahaRe"
+[[mods.dependencies]]
