@@ -17,7 +17,7 @@ import javax.annotation.Nullable;
 public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlockEntity {
 
     /** 32 buckets = 32000 mB */
-    public static final int FLUID_CAPACITY = 32000;
+    public static final int FLUID_CAPACITY = 32000; // 32B
 
     public final FluidTank fluidTank = new FluidTank(FLUID_CAPACITY) {
         @Override

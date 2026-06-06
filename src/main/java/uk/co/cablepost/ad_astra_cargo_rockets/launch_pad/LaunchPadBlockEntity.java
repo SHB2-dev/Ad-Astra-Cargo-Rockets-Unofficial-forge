@@ -40,7 +40,7 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
             pos, state,
             new int[]{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },
             new int[]{ 9,10,11,12,13,14,15,16,17 },
-            50000, 1000, 0, false
+            1000000, 1000, 0, false
         );
     }
 
@@ -123,7 +123,7 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
         List<CargoRocketEntity> nearby = level.getEntitiesOfClass(
                 CargoRocketEntity.class, new AABB(worldPosition).inflate(2), CargoRocketEntity::isAlive);
         nearby = nearby.stream()
-                .filter(x -> x.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition).add(0, 0.5, 0)) < 1f)
+                .filter(x -> x.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition).add(0, 0.5, 0)) < 2f)
                 .toList();
         return nearby.size() == 1 ? nearby.get(0) : null;
     }
@@ -154,6 +154,10 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
         if (drained.getAmount() == actualFuel) {
             _energyStorage.extractEnergy(getEnergyRequiredForLaunch() * difficulty, false);
             rocket.targetPlanet = planet;
+            // levelにエンティティの変更を通知
+            if (level != null) {
+                level.broadcastEntityEvent(rocket, (byte)0);
+            }
             setChanged();
             return null;
         }
@@ -161,10 +165,11 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
     }
 
     public int getEnergyRequiredForLaunch() { return 5000; }
-    public int getFuelRequiredForLaunch() { return 600000; }
+    public int getFuelRequiredForLaunch() { return 3000; }
     public int getEnergy() { return _energyStorage.getEnergyStored(); }
     public int getMaxEnergy() { return _energyStorage.getMaxEnergyStored(); }
     public int getFuel() { return fluidTank.getFluidAmount(); }
+    public int getMaxFuel() { return fluidTank.getCapacity(); }
 
     public Map<String, Integer> getValidDestinations() {
         if (level == null || level.getServer() == null) return new HashMap<>();

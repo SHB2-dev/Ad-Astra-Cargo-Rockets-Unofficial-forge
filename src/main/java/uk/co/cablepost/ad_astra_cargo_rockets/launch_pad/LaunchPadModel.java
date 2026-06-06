@@ -17,10 +17,14 @@ public class LaunchPadModel extends Model {
             new ModelLayerLocation(new ResourceLocation(AdAstraCargoRockets.MOD_ID, "launch_pad"), "main");
 
     private final ModelPart base;
+    private final ModelPart mainBody;
+    private final ModelPart topPlatform;
 
     public LaunchPadModel(ModelPart root) {
         super(RenderType::entitySolid);
-        this.base = root.getChild("base");
+        this.base        = root.getChild("base");
+        this.mainBody    = this.base.getChild("main_body");
+        this.topPlatform = this.base.getChild("top_platform");
     }
 
     public static LayerDefinition createBodyLayer() {
@@ -30,14 +34,16 @@ public class LaunchPadModel extends Model {
         PartDefinition base = rootPart.addOrReplaceChild("base",
                 CubeListBuilder.create(), PartPose.offset(0f, 24f, 0f));
 
+        // Main body: from [-16,0,-16] to [32,13,32] → size 48x13x48
         base.addOrReplaceChild("main_body",
-                CubeListBuilder.create().texOffs(0, 0)
-                        .addBox(-16f, -24f, -16f, 48f, 13f, 48f, new CubeDeformation(0f)),
+                CubeListBuilder.create()
+                        .texOffs(0, 0).addBox(-16f, -24f, -16f, 48, 13, 48, new CubeDeformation(0f)),
                 PartPose.offset(0f, 0f, 0f));
 
+        // Top platform: from [-15,13,-15] to [31,15,31] → size 46x2x46
         base.addOrReplaceChild("top_platform",
-                CubeListBuilder.create().texOffs(0, 61)
-                        .addBox(-15f, -11f, -15f, 46f, 2f, 46f, new CubeDeformation(0f)),
+                CubeListBuilder.create()
+                        .texOffs(0, 61).addBox(-15f, -11f, -15f, 46, 2, 46, new CubeDeformation(0f)),
                 PartPose.offset(0f, 0f, 0f));
 
         return LayerDefinition.create(mesh, 256, 256);

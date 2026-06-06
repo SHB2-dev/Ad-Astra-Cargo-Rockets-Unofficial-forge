@@ -82,19 +82,13 @@ public class CargoRocketEntity extends Entity {
 
     @Override public boolean canBeCollidedWith() { return true; }
     @Override public boolean isPushable() { return false; }
+    // プレイヤーが殴って攻撃できるようにする
+    @Override public boolean isPickable() { return true; }
+    @Override public boolean skipAttackInteraction(net.minecraft.world.entity.Entity attacker) { return false; }
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        if (level().isClientSide || hand == InteractionHand.OFF_HAND) return InteractionResult.PASS;
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(" ====== Ship inventory ======"));
-        for (int i = 0; i < inventory.size(); i++) {
-            var stack = inventory.get(i);
-            if (!stack.isEmpty())
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                        "Slot " + i + ": " + stack.getCount() + "x " + stack.getDisplayName().getString()));
-        }
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(" =========================="));
-        return InteractionResult.SUCCESS;
+        return InteractionResult.PASS;
     }
 
     private void dropInventory() {
@@ -117,16 +111,20 @@ public class CargoRocketEntity extends Entity {
 
     @Override
     public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        if (level().isClientSide) return false;
         if (isInvulnerableTo(source)) return false;
-        if (level().isClientSide) return true;
         dropInventory();
         dropSelf();
-        kill();
+        discard();
         return true;
     }
 
     public void killRocket() {
-        hurt(damageSources().genericKill(), Float.MAX_VALUE);
+        if (!level().isClientSide) {
+            dropInventory();
+            dropSelf();
+            discard();
+        }
     }
 
     @Override

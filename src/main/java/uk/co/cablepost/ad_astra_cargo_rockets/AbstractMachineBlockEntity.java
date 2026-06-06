@@ -171,8 +171,17 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
                 _inventory.set(slot, ItemStack.of(slotTag));
             }
         }
-        // Energy
-        _energyStorage.receiveEnergy(tag.getInt("Energy"), false);
+        // Energy: forceSetで制限なく復元
+        int savedEnergy = tag.getInt("Energy");
+        _energyStorage.receiveEnergy(savedEnergy, true); // simulate=true で容量確認
+        // リフレクションで直接セット
+        try {
+            java.lang.reflect.Field f = net.minecraftforge.energy.EnergyStorage.class.getDeclaredField("energy");
+            f.setAccessible(true);
+            f.set(_energyStorage, Math.min(savedEnergy, _energyStorage.getMaxEnergyStored()));
+        } catch (Exception e) {
+            _energyStorage.receiveEnergy(savedEnergy, false);
+        }
     }
 
     // --- Capabilities ---
