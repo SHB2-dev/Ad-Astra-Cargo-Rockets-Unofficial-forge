@@ -71,13 +71,32 @@ public class CargoRocketEntity extends Entity {
     public void setLaunchTicks(int ticks) { entityData.set(TRACKED_LAUNCH_TICKS, ticks); }
     public int getLaunchTicks() { return entityData.get(TRACKED_LAUNCH_TICKS); }
 
+    // 固定インスタンス - 毎回生成すると変更が失われる
+    private final net.minecraft.world.SimpleContainer inventoryContainer = new net.minecraft.world.SimpleContainer(9) {
+        @Override public ItemStack getItem(int slot) { return inventory.get(slot); }
+        @Override public void setItem(int slot, ItemStack stack) { inventory.set(slot, stack); setChanged(); }
+        @Override public int getContainerSize() { return 9; }
+        @Override public boolean isEmpty() { return inventory.stream().allMatch(ItemStack::isEmpty); }
+        @Override public ItemStack removeItem(int slot, int amount) {
+            ItemStack stack = inventory.get(slot);
+            if (stack.isEmpty()) return ItemStack.EMPTY;
+            ItemStack split = stack.split(amount);
+            if (stack.isEmpty()) inventory.set(slot, ItemStack.EMPTY);
+            setChanged();
+            return split;
+        }
+        @Override public ItemStack removeItemNoUpdate(int slot) {
+            ItemStack old = inventory.get(slot);
+            inventory.set(slot, ItemStack.EMPTY);
+            return old;
+        }
+        @Override public void clearContent() {
+            for (int i = 0; i < 9; i++) inventory.set(i, ItemStack.EMPTY);
+        }
+    };
+
     public net.minecraft.world.SimpleContainer getInventory() {
-        net.minecraft.world.SimpleContainer c = new net.minecraft.world.SimpleContainer(9) {
-            @Override public ItemStack getItem(int slot) { return inventory.get(slot); }
-            @Override public void setItem(int slot, ItemStack stack) { inventory.set(slot, stack); }
-            @Override public int getContainerSize() { return 9; }
-        };
-        return c;
+        return inventoryContainer;
     }
 
     @Override public boolean canBeCollidedWith() { return true; }

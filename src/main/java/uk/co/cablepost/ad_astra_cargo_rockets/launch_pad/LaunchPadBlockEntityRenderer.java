@@ -18,6 +18,12 @@ public class LaunchPadBlockEntityRenderer implements BlockEntityRenderer<LaunchP
     }
 
     @Override
+    public boolean shouldRenderOffScreen(LaunchPadBlockEntity be) { return true; }
+
+    @Override
+    public int getViewDistance() { return 256; }
+
+    @Override
     public void render(LaunchPadBlockEntity blockEntity, float tickDelta,
                        PoseStack matrices, MultiBufferSource buffers,
                        int light, int overlay) {

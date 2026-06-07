@@ -21,7 +21,7 @@ public class LaunchPadDummyBlockEntity extends BlockEntity {
     public @Nonnull <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
         // 中心のBEにCapabilityを転送
         if (level != null) {
-            BlockPos center = LaunchPadDummyBlock.findCenterPos((net.minecraft.world.level.Level) level, worldPosition);
+            BlockPos center = LaunchPadDummyBlock.findCenterPos(level, worldPosition);
             if (center != null) {
                 BlockEntity centerBE = level.getBlockEntity(center);
                 if (centerBE instanceof LaunchPadBlockEntity launchPad) {

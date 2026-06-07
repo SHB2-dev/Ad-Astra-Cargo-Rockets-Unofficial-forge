@@ -40,11 +40,16 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
             pos, state,
             new int[]{ 0, 1, 2, 3, 4, 5, 6, 7, 8 },
             new int[]{ 9,10,11,12,13,14,15,16,17 },
-            1000000, 1000, 0, false
+            1000000, 100000, 0, false
         );
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, LaunchPadBlockEntity be) {}
+    public static void tick(Level level, BlockPos pos, BlockState state, LaunchPadBlockEntity be) {
+        // リアルタイムGUI同期のためにsetChangedを毎tick呼ぶ
+        if (!level.isClientSide) {
+            be.setChanged();
+        }
+    }
 
     @Override public int getMaxProcessProgress() { return 0; }
     @Override public int processEnergyConsumption() { return 0; }
@@ -154,10 +159,6 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
         if (drained.getAmount() == actualFuel) {
             _energyStorage.extractEnergy(getEnergyRequiredForLaunch() * difficulty, false);
             rocket.targetPlanet = planet;
-            // levelにエンティティの変更を通知
-            if (level != null) {
-                level.broadcastEntityEvent(rocket, (byte)0);
-            }
             setChanged();
             return null;
         }

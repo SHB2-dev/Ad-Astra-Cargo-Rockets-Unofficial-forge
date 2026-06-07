@@ -40,6 +40,8 @@ public class LaunchPadMenu extends AbstractContainerMenu {
             @Override public int getCount() { return DATA_COUNT; }
         } : new SimpleContainerData(DATA_COUNT);
         addDataSlots(data);
+        // 初回同期を強制
+        broadcastChanges();
 
         if (blockEntity != null) {
             for (int i = 0; i < 9; i++)
@@ -70,6 +72,11 @@ public class LaunchPadMenu extends AbstractContainerMenu {
     public int getMaxEnergy() { return reconstruct(2, 3); }
     public int getFuel()      { return data.get(4) & 0xFFFF; }
     public int getMaxFuel()   { return data.get(5) & 0xFFFF; }
+
+    @Override
+    public void broadcastChanges() {
+        super.broadcastChanges();
+    }
 
     @Override public boolean stillValid(Player p) {
         return blockEntity == null || blockEntity.stillValid(p);

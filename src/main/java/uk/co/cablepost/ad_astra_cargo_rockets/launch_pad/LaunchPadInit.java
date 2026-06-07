@@ -32,7 +32,10 @@ public class LaunchPadInit {
         DeferredRegister<Block> blocks = DeferredRegister.create(ForgeRegistries.BLOCKS, AdAstraCargoRockets.MOD_ID);
 
         block = blocks.register("launch_pad", () -> new LaunchPadBlock(
-                BlockBehaviour.Properties.of().strength(3.5f).requiresCorrectToolForDrops().noOcclusion()));
+                BlockBehaviour.Properties.of()
+                        .strength(2.0f, 6.0f)
+                        .requiresCorrectToolForDrops()
+                        .noOcclusion()));
 
         dummyBlock = blocks.register("launch_pad_dummy", () -> new LaunchPadDummyBlock(
                 BlockBehaviour.Properties.of().strength(3.5f).noOcclusion().noLootTable()));

@@ -56,9 +56,49 @@ public class LaunchPadBlock extends BaseEntityBlock {
                 LaunchPadBlockEntity::tick);
     }
 
+    @Nullable
+    @Override
+    public BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext ctx) {
+        BlockPos pos = ctx.getClickedPos();
+        net.minecraft.world.level.Level level = ctx.getLevel();
+        // 3×3スペースチェック
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                BlockPos neighbor = pos.offset(dx, 0, dz);
+                BlockState neighborState = level.getBlockState(neighbor);
+                if (!neighborState.isAir() && !neighborState.canBeReplaced()
+                        && !(neighborState.getBlock() instanceof LaunchPadDummyBlock)) {
+                    // 設置不可 - プレイヤーに通知
+                    if (!level.isClientSide) {
+                        ctx.getPlayer().sendSystemMessage(
+                            net.minecraft.network.chat.Component.literal("[Launch Pad] Needs 3x3 clear space!"));
+                    }
+                    return null;
+                }
+            }
+        }
+        return super.getStateForPlacement(ctx);
+    }
+
     @Override
     public boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
-        return level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP);
+        if (!level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP)) {
+            return false;
+        }
+        // 周囲8ブロックにソリッドブロックがないかチェック
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                BlockPos neighbor = pos.offset(dx, 0, dz);
+                BlockState neighborState = level.getBlockState(neighbor);
+                if (!neighborState.isAir() && !neighborState.canBeReplaced()
+                        && !(neighborState.getBlock() instanceof LaunchPadDummyBlock)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     @Override
@@ -82,7 +122,9 @@ public class LaunchPadBlock extends BaseEntityBlock {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;
                 BlockPos dPos = center.offset(dx, 0, dz);
-                if (!level.getBlockState(dPos).is(dummy)) {
+                BlockState existing = level.getBlockState(dPos);
+                // 空気・草・花などの置き換え可能なブロックのみ上書き
+                if (!existing.is(dummy) && (existing.isAir() || existing.canBeReplaced())) {
                     level.setBlockAndUpdate(dPos, dummy.defaultBlockState());
                 }
             }

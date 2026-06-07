@@ -22,14 +22,17 @@ public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlo
     public final FluidTank fluidTank = new FluidTank(FLUID_CAPACITY) {
         @Override
         public boolean isFluidValid(FluidStack stack) {
-            String fluidId = net.minecraftforge.registries.ForgeRegistries.FLUIDS
-                    .getKey(stack.getFluid()).toString();
-            return ModConfig.INSTANCE.fuels.containsKey(fluidId);
+            // 全ての流体を受け入れる（燃料チェックは発射時に行う）
+            return true;
         }
 
         @Override
         protected void onContentsChanged() {
             setChanged();
+            // クライアントに更新を通知
+            if (level != null && !level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
         }
     };
 
