@@ -26,24 +26,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Gradle Wrapper がない場合、wrapperファイルを直接生成（gradle コマンド不使用）
       - name: Setup Gradle wrapper
         run: |
           if [ ! -f gradlew ]; then
             GRADLE_VERSION=8.11.1
             mkdir -p gradle/wrapper
-            # gradle-wrapper.jar をダウンロード
             curl -fL "https://github.com/gradle/gradle/raw/v${GRADLE_VERSION}/gradle/wrapper/gradle-wrapper.jar" \
               -o gradle/wrapper/gradle-wrapper.jar
-            # gradle-wrapper.properties を作成
-            cat > gradle/wrapper/gradle-wrapper.properties << PROPS
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-PROPS
-            # gradlew スクリプトをダウンロード
+            printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-%s-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' "${GRADLE_VERSION}" \
+              > gradle/wrapper/gradle-wrapper.properties
             curl -fL "https://raw.githubusercontent.com/gradle/gradle/v${GRADLE_VERSION}/gradlew" \
               -o gradlew
           fi
@@ -93,13 +84,8 @@ PROPS
             mkdir -p gradle/wrapper
             curl -fL "https://github.com/gradle/gradle/raw/v${GRADLE_VERSION}/gradle/wrapper/gradle-wrapper.jar" \
               -o gradle/wrapper/gradle-wrapper.jar
-            cat > gradle/wrapper/gradle-wrapper.properties << PROPS
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-PROPS
+            printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-%s-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' "${GRADLE_VERSION}" \
+              > gradle/wrapper/gradle-wrapper.properties
             curl -fL "https://raw.githubusercontent.com/gradle/gradle/v${GRADLE_VERSION}/gradlew" \
               -o gradlew
           fi
