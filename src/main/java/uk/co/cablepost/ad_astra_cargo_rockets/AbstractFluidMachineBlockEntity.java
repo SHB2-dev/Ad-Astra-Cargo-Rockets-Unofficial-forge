@@ -17,26 +17,41 @@ import javax.annotation.Nullable;
 public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlockEntity {
 
     /** 32 buckets = 32000 mB */
-    public static final int FLUID_CAPACITY = 32000; // 32B
+    public static final int FLUID_CAPACITY = 32000; // 32B 燃料タンク
+    public static final int CARGO_FLUID_CAPACITY = 32000; // 32B 貨物タンク
 
+    // 燃料タンク（燃料専用）
     public final FluidTank fluidTank = new FluidTank(FLUID_CAPACITY) {
         @Override
         public boolean isFluidValid(FluidStack stack) {
-            // 全ての流体を受け入れる（燃料チェックは発射時に行う）
             return true;
         }
-
         @Override
         protected void onContentsChanged() {
             setChanged();
-            // クライアントに更新を通知
             if (level != null && !level.isClientSide) {
                 level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
             }
         }
     };
 
-    private final LazyOptional<IFluidHandler> fluidHandler = LazyOptional.of(() -> fluidTank);
+    // 貨物タンク（輸送用液体）
+    public final FluidTank cargoFluidTank = new FluidTank(CARGO_FLUID_CAPACITY) {
+        @Override
+        public boolean isFluidValid(FluidStack stack) {
+            return true;
+        }
+        @Override
+        protected void onContentsChanged() {
+            setChanged();
+            if (level != null && !level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
+        }
+    };
+
+    private final LazyOptional<IFluidHandler> fluidHandler      = LazyOptional.of(() -> fluidTank);
+    private final LazyOptional<IFluidHandler> cargoFluidHandler = LazyOptional.of(() -> cargoFluidTank);
 
     public AbstractFluidMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state,
                                             int[] inputSlots, int[] outputSlots,
@@ -48,7 +63,11 @@ public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlo
     @Override
     public @Nonnull <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.FLUID_HANDLER) {
-            return fluidHandler.cast();
+            // 下面 = 燃料タンク、それ以外 = 貨物タンク
+            if (side == Direction.DOWN) {
+                return fluidHandler.cast();
+            }
+            return cargoFluidHandler.cast();
         }
         return super.getCapability(cap, side);
     }
@@ -57,6 +76,7 @@ public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlo
     public void invalidateCaps() {
         super.invalidateCaps();
         fluidHandler.invalidate();
+        cargoFluidHandler.invalidate();
     }
 
     @Override
@@ -65,6 +85,9 @@ public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlo
         CompoundTag fluidTag = new CompoundTag();
         fluidTank.writeToNBT(fluidTag);
         tag.put("FluidContent", fluidTag);
+        CompoundTag cargoFluidTag = new CompoundTag();
+        cargoFluidTank.writeToNBT(cargoFluidTag);
+        tag.put("CargoFluidContent", cargoFluidTag);
     }
 
     @Override
@@ -72,6 +95,9 @@ public abstract class AbstractFluidMachineBlockEntity extends AbstractMachineBlo
         super.load(tag);
         if (tag.contains("FluidContent")) {
             fluidTank.readFromNBT(tag.getCompound("FluidContent"));
+        }
+        if (tag.contains("CargoFluidContent")) {
+            cargoFluidTank.readFromNBT(tag.getCompound("CargoFluidContent"));
         }
     }
 }

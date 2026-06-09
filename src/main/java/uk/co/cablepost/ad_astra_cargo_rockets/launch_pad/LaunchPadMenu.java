@@ -18,7 +18,7 @@ public class LaunchPadMenu extends AbstractContainerMenu {
     // 各値を上位・下位に分割してshortの制限を回避
     // [0]=energy上位, [1]=energy下位, [2]=maxEnergy上位, [3]=maxEnergy下位
     // [4]=fuel, [5]=maxFuel
-    private static final int DATA_COUNT = 6;
+    private static final int DATA_COUNT = 8;
 
     public LaunchPadMenu(int syncId, Inventory playerInventory, @Nullable LaunchPadBlockEntity blockEntity) {
         super(AdAstraCargoRockets.LAUNCH_PAD.getMenuType().get(), syncId);
@@ -33,6 +33,8 @@ public class LaunchPadMenu extends AbstractContainerMenu {
                     case 3 -> blockEntity.getMaxEnergy() & 0xFFFF;
                     case 4 -> blockEntity.getFuel();
                     case 5 -> blockEntity.getMaxFuel();
+                    case 6 -> blockEntity.getCargoFluid();
+                    case 7 -> blockEntity.getMaxCargoFluid();
                     default -> 0;
                 };
             }
@@ -70,8 +72,10 @@ public class LaunchPadMenu extends AbstractContainerMenu {
 
     public int getEnergy()    { return reconstruct(0, 1); }
     public int getMaxEnergy() { return reconstruct(2, 3); }
-    public int getFuel()      { return data.get(4) & 0xFFFF; }
-    public int getMaxFuel()   { return data.get(5) & 0xFFFF; }
+    public int getFuel()         { return data.get(4) & 0xFFFF; }
+    public int getMaxFuel()      { return data.get(5) & 0xFFFF; }
+    public int getCargoFluid()   { return data.get(6) & 0xFFFF; }
+    public int getMaxCargoFluid(){ return data.get(7) & 0xFFFF; }
 
     @Override
     public void broadcastChanges() {

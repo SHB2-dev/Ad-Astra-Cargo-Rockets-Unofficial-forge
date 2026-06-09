@@ -148,6 +148,32 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     public void destroyRocket() { blockEntity.destroyRocket(); }
 
     @LuaFunction(mainThread = true)
+    public final int getFuel() { return blockEntity.getFuel(); }
+
+    @LuaFunction(mainThread = true)
+    public final int getMaxFuel() { return blockEntity.getMaxFuel(); }
+
+    @LuaFunction(mainThread = true)
+    public final int getCargoFluid() { return blockEntity.getCargoFluid(); }
+
+    @LuaFunction(mainThread = true)
+    public final int getMaxCargoFluid() { return blockEntity.getMaxCargoFluid(); }
+
+    @LuaFunction(mainThread = true)
+    public final String getCargoFluidType() {
+        net.minecraftforge.fluids.FluidStack fluid = blockEntity.cargoFluidTank.getFluid();
+        if (fluid.isEmpty()) return "empty";
+        return net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fluid.getFluid()).toString();
+    }
+
+    @LuaFunction(mainThread = true)
+    public final String getFuelType() {
+        net.minecraftforge.fluids.FluidStack fluid = blockEntity.fluidTank.getFluid();
+        if (fluid.isEmpty()) return "empty";
+        return net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fluid.getFluid()).toString();
+    }
+
+    @LuaFunction(mainThread = true)
     public final void loadAllItems(IArguments args) throws LuaException {
         if (blockEntity.getRocket() == null) throw new LuaException("No rocket found");
         String filterId = parseItemId(args.optString(0, null));

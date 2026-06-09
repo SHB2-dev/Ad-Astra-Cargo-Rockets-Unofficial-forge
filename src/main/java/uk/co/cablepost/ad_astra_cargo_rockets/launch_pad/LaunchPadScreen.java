@@ -57,6 +57,10 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         renderSegmentBar(g, ox + imageWidth - 38, barTopY, 12, barH,
                 menu.getFuel(), menu.getMaxFuel(), 0xFF00AADD, SEGMENTS);
 
+        // 貨物液体バー (燃料の左) 10分割
+        renderSegmentBar(g, ox + imageWidth - 54, barTopY, 12, barH,
+                menu.getCargoFluid(), menu.getMaxCargoFluid(), 0xFF00DD88, SEGMENTS);
+
         // テキスト
         int tx = ox + 8;
         int ty = oy + BLANK_TOP + 4;
@@ -66,6 +70,9 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         g.drawString(font, "Fuel:",   tx, ty + 22, 0x404040, false);
         g.drawString(font, menu.getFuel() + " / " + menu.getMaxFuel() + " mB",
                 tx, ty + 32, 0x404040, false);
+        g.drawString(font, "Cargo:",  tx, ty + 44, 0x404040, false);
+        g.drawString(font, menu.getCargoFluid() + " / " + menu.getMaxCargoFluid() + " mB",
+                tx, ty + 54, 0x404040, false);
 
         drawSlotGrid(g, ox+8, oy+PLAYER_INV_Y, 9, 3);
         drawSlotGrid(g, ox+8, oy+HOTBAR_Y,     9, 1);

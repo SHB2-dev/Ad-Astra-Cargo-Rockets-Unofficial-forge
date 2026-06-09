@@ -171,6 +171,8 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
     public int getMaxEnergy() { return _energyStorage.getMaxEnergyStored(); }
     public int getFuel() { return fluidTank.getFluidAmount(); }
     public int getMaxFuel() { return fluidTank.getCapacity(); }
+    public int getCargoFluid() { return cargoFluidTank.getFluidAmount(); }
+    public int getMaxCargoFluid() { return cargoFluidTank.getCapacity(); }
 
     public Map<String, Integer> getValidDestinations() {
         if (level == null || level.getServer() == null) return new HashMap<>();
