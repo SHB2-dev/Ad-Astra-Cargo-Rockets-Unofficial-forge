@@ -149,9 +149,9 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         int eBarX = ox + imageWidth - 22;
         if (isMouseOverBar(mouseX, mouseY, eBarX, barTopY, 12, barH)) {
             g.renderTooltip(font, java.util.List.of(
-                net.minecraft.network.chat.Component.literal("Energy"),
+                net.minecraft.network.chat.Component.literal("Energy").getVisualOrderText(),
                 net.minecraft.network.chat.Component.literal(
-                    formatVal(menu.getEnergy()) + " / " + formatVal(menu.getMaxEnergy()) + " FE")
+                    formatVal(menu.getEnergy()) + " / " + formatVal(menu.getMaxEnergy()) + " FE").getVisualOrderText()
             ), mouseX, mouseY);
             return;
         }
@@ -159,9 +159,9 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         int fBarX = ox + imageWidth - 38;
         if (isMouseOverBar(mouseX, mouseY, fBarX, barTopY, 12, barH)) {
             g.renderTooltip(font, java.util.List.of(
-                net.minecraft.network.chat.Component.literal("Fuel"),
+                net.minecraft.network.chat.Component.literal("Fuel").getVisualOrderText(),
                 net.minecraft.network.chat.Component.literal(
-                    menu.getFuel() + " / " + menu.getMaxFuel() + " mB")
+                    menu.getFuel() + " / " + menu.getMaxFuel() + " mB").getVisualOrderText()
             ), mouseX, mouseY);
             return;
         }
@@ -169,9 +169,9 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         int cBarX = ox + imageWidth - 54;
         if (isMouseOverBar(mouseX, mouseY, cBarX, barTopY, 12, barH)) {
             g.renderTooltip(font, java.util.List.of(
-                net.minecraft.network.chat.Component.literal("Cargo Fluid"),
+                net.minecraft.network.chat.Component.literal("Cargo Fluid").getVisualOrderText(),
                 net.minecraft.network.chat.Component.literal(
-                    menu.getCargoFluid() + " / " + menu.getMaxCargoFluid() + " mB")
+                    menu.getCargoFluid() + " / " + menu.getMaxCargoFluid() + " mB").getVisualOrderText()
             ), mouseX, mouseY);
         }
     }
