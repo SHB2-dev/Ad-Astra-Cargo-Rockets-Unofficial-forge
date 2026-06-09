@@ -21,6 +21,23 @@ This mod add itemtag `denied_in_launch_pad` to prevent to use specified item in 
 ## customizable the difficulty level and fuel efficiency for your destination 
 Change `config/ad_astra_cargo_rockets.json` to customize target destination cost and fuel efficient.
 
+---
+
+# Fluid & Energy Connection
+
+The launchpad has two separate fluid tanks and supports Forge energy (FE).
+
+| Side | Function |
+|------|----------|
+| **Bottom** | Fuel tank (input only) |
+| **Top / Sides** | Cargo fluid tank (input & output) |
+| **Any side** | Forge Energy (FE) input |
+
+- Connect fuel pipes to the **bottom** face to supply rocket fuel (e.g. `ad_astra:fuel`, `ad_astra:cryo_fuel`).
+- Connect fluid pipes to the **top or side** faces to transport cargo liquids.
+- You can also right-click with a bucket to fill either tank (bottom face = fuel, other faces = cargo).
+
+---
 
 ## Added Useful CC's Function
 ## 📥 `loadAllItems([filter])`
@@ -177,9 +194,57 @@ Returns the current non-empty inventory of the rocket.
     - `max_count` (int): Maximum stack size.
 
 ---
+
+## 🛢️ `getFuel()`
+Returns the current fuel amount in the launchpad's fuel tank.
+
+### Returns
+- `int`: Current fuel in mB.
+
+---
+
+## 🛢️ `getMaxFuel()`
+Returns the maximum fuel capacity of the launchpad's fuel tank.
+
+### Returns
+- `int`: Maximum fuel in mB.
+
+---
+
+## 🛢️ `getFuelType()`
+Returns the fluid ID of the fuel currently in the fuel tank.
+
+### Returns
+- `string`: Fluid registry ID (e.g. `"ad_astra:fuel"`), or `"empty"` if the tank is empty.
+
+---
+
+## 🧪 `getCargoFluid()`
+Returns the current amount of cargo fluid in the launchpad's cargo tank.
+
+### Returns
+- `int`: Current cargo fluid in mB.
+
+---
+
+## 🧪 `getMaxCargoFluid()`
+Returns the maximum cargo fluid capacity.
+
+### Returns
+- `int`: Maximum cargo fluid in mB.
+
+---
+
+## 🧪 `getCargoFluidType()`
+Returns the fluid ID of the cargo fluid currently in the cargo tank.
+
+### Returns
+- `string`: Fluid registry ID, or `"empty"` if the tank is empty.
+
+---
+
 ## Credit
 Fork Source: Ad-Astra-Cargo-Rockets-Unofficial by ChiyahaRe 
 URL: https://github.com/ChiyahaRe/Ad-Astra-Cargo-Rockets-Unofficial
 fork of the original fork Source: Ad Astra Cargo Rockets by BillBodkin
 URL: https://modrinth.com/mod/ad-astra-cargo-rockets
-
