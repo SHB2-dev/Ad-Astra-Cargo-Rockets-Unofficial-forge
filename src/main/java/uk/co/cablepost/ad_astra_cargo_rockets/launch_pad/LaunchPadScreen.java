@@ -9,13 +9,13 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
 
     static final int SLOT0_Y      = 18;
     static final int SLOT1_Y      = 36;
-    static final int PLAYER_INV_Y = 130;
-    static final int HOTBAR_Y     = 188;
-    static final int IMAGE_H      = 213;
+    static final int PLAYER_INV_Y = 160;
+    static final int HOTBAR_Y     = 218;
+    static final int IMAGE_H      = 243;
 
     private static final int BLANK_TOP = 54;
-    private static final int PROG_Y    = 110;
-    private static final int INV_LBL_Y = 120;
+    private static final int PROG_Y    = 140;
+    private static final int INV_LBL_Y = 150;
 
     private static final int COL_BG    = 0xFFC6C6C6;
     private static final int COL_DARK  = 0xFF555555;
@@ -136,5 +136,48 @@ public class LaunchPadScreen extends AbstractContainerScreen<LaunchPadMenu> {
         renderBackground(g);
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
+        renderBarTooltips(g, mouseX, mouseY);
+    }
+
+    private void renderBarTooltips(GuiGraphics g, int mouseX, int mouseY) {
+        int ox = (width  - imageWidth)  / 2;
+        int oy = (height - imageHeight) / 2;
+        int barH   = PROG_Y - BLANK_TOP - 8;
+        int barTopY = oy + BLANK_TOP + 4;
+
+        // エネルギーバー
+        int eBarX = ox + imageWidth - 22;
+        if (isMouseOverBar(mouseX, mouseY, eBarX, barTopY, 12, barH)) {
+            g.renderTooltip(font, java.util.List.of(
+                net.minecraft.network.chat.Component.literal("Energy"),
+                net.minecraft.network.chat.Component.literal(
+                    formatVal(menu.getEnergy()) + " / " + formatVal(menu.getMaxEnergy()) + " FE")
+            ), mouseX, mouseY);
+            return;
+        }
+        // 燃料バー
+        int fBarX = ox + imageWidth - 38;
+        if (isMouseOverBar(mouseX, mouseY, fBarX, barTopY, 12, barH)) {
+            g.renderTooltip(font, java.util.List.of(
+                net.minecraft.network.chat.Component.literal("Fuel"),
+                net.minecraft.network.chat.Component.literal(
+                    menu.getFuel() + " / " + menu.getMaxFuel() + " mB")
+            ), mouseX, mouseY);
+            return;
+        }
+        // 貨物バー
+        int cBarX = ox + imageWidth - 54;
+        if (isMouseOverBar(mouseX, mouseY, cBarX, barTopY, 12, barH)) {
+            g.renderTooltip(font, java.util.List.of(
+                net.minecraft.network.chat.Component.literal("Cargo Fluid"),
+                net.minecraft.network.chat.Component.literal(
+                    menu.getCargoFluid() + " / " + menu.getMaxCargoFluid() + " mB")
+            ), mouseX, mouseY);
+        }
+    }
+
+    private boolean isMouseOverBar(int mouseX, int mouseY, int barX, int barY, int barW, int barH) {
+        return mouseX >= barX && mouseX <= barX + barW
+            && mouseY >= barY && mouseY <= barY + barH;
     }
 }

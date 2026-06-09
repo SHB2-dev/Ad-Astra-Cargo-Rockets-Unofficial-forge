@@ -58,7 +58,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mod-jar
+          name: ad-astra-cargo-rocket-unofficial-forge
           path: build/libs/*.jar
           if-no-files-found: error
 
