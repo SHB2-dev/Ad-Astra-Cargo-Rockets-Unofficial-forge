@@ -39,9 +39,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # gradlew に実行権限を付与
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      # Gradle Wrapper がなければ自動生成、あれば実行権限を付与
+      - name: Setup Gradle wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version=8.4
+          fi
+          chmod +x gradlew
 
       # MOD をビルド（jar ファイルを生成）
       - name: Build with Gradle
@@ -83,8 +87,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version=8.4
+          fi
+          chmod +x gradlew
 
       - name: Build with Gradle
         run: ./gradlew build
