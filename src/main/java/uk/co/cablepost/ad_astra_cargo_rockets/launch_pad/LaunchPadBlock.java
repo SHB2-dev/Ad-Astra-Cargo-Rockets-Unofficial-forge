@@ -160,12 +160,11 @@ public class LaunchPadBlock extends BaseEntityBlock {
                     launchPad.getCapability(
                         net.minecraftforge.common.capabilities.ForgeCapabilities.FLUID_HANDLER,
                         face).ifPresent(tankHandler -> {
-                        net.minecraftforge.fluids.FluidUtil.tryEmptyContainer(stack, tankHandler, Integer.MAX_VALUE, player, true)
-                    net.minecraftforge.fluids.FluidActionResult fluidResult =
-                        net.minecraftforge.fluids.FluidUtil.tryEmptyContainer(stack, tankHandler, Integer.MAX_VALUE, player, true);
-                    if (fluidResult.isSuccess()) {
-                        player.setItemInHand(hand, fluidResult.getResult());
-                    }
+                        net.minecraftforge.fluids.FluidActionResult fluidResult =
+                            net.minecraftforge.fluids.FluidUtil.tryEmptyContainer(stack, tankHandler, Integer.MAX_VALUE, player, true);
+                        if (fluidResult.isSuccess()) {
+                            player.setItemInHand(hand, fluidResult.getResult());
+                        }
                     });
                 }
             }
