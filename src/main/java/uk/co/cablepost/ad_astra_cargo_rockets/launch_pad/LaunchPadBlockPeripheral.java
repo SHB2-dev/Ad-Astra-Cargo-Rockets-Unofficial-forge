@@ -8,6 +8,7 @@ import dan200.computercraft.api.peripheral.IPeripheral;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.registries.ForgeRegistries;
 import javax.annotation.Nullable;
@@ -188,28 +189,67 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     }
 
     @LuaFunction(mainThread = true)
-    public final void loadAllItems(IArguments args) throws LuaException {
-        if (blockEntity.getRocket() == null) throw new LuaException("No rocket found");
+    public final int loadAllItems(IArguments args) throws LuaException {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        if (rocket == null) throw new LuaException("No rocket found");
         String filterId = parseItemId(args.optString(0, null));
+        int rocketSize = rocket.getInventory().getContainerSize();
+        int remaining = 0;
         for (int i = 1; i <= 9; i++) {
             var stack = blockEntity.getStack(i - 1);
             if (stack.isEmpty()) continue;
             if (filterId != null && !ForgeRegistries.ITEMS.getKey(stack.getItem()).toString().equals(filterId)) continue;
-            @Nullable ItemMoveFailReason r = blockEntity.moveStackFromLaunchPadToRocket(i, i);
-            if (r != null && r != ItemMoveFailReason.TARGET_FULL)
+
+            // 固定スロット対応 (i -> i) だけだと、ロケットの同じ番号のスロットが別アイテムで
+            // 埋まっている場合に積めなくなる。空きスロット・同種スロットも含めて探すことで
+            // 「まとめて積む」運用で複数種類のアイテムが混在しても正しく積めるようにする。
+            // 1. まず同じアイテムが入っていて満杯でないスロットを探す
+            // 2. 無ければ空のスロットを探す
+            // 3. それでも入らなければ次のスロットへ（出力にTARGET_FULLとして残数加算）
+            boolean movedAny = true;
+            while (movedAny && !blockEntity.getStack(i - 1).isEmpty()) {
+                movedAny = false;
+                int targetSlot = findRocketSlotForItem(rocket, blockEntity.getStack(i - 1), rocketSize);
+                if (targetSlot == -1) break;
+                @Nullable ItemMoveFailReason r = blockEntity.moveStackFromLaunchPadToRocket(i, targetSlot);
+                if (r == null) { movedAny = true; continue; }
+                if (r == ItemMoveFailReason.TARGET_FULL) break;
                 switch (r) {
                     case INVALID_SLOT -> throw new LuaException("Invalid slot: " + i);
                     case NO_ROCKET -> throw new LuaException("No rocket found");
                     default -> {}
                 }
+            }
+            if (!blockEntity.getStack(i - 1).isEmpty()) {
+                remaining += blockEntity.getStack(i - 1).getCount();
+            }
         }
+        return remaining;
+    }
+
+    /** ロケット内で、指定アイテムを受け入れられるスロット番号(1始まり)を探す。無ければ-1。 */
+    private static int findRocketSlotForItem(CargoRocketEntity rocket, ItemStack toPlace, int rocketSize) {
+        // 同種アイテムが入っていて、まだ満杯でないスロットを優先
+        for (int s = 1; s <= rocketSize; s++) {
+            var existing = rocket.getInventory().getItem(s - 1);
+            if (!existing.isEmpty() && existing.getItem().equals(toPlace.getItem())
+                    && existing.getCount() < existing.getMaxStackSize()) {
+                return s;
+            }
+        }
+        // 空きスロットを探す
+        for (int s = 1; s <= rocketSize; s++) {
+            if (rocket.getInventory().getItem(s - 1).isEmpty()) return s;
+        }
+        return -1;
     }
 
     @LuaFunction(mainThread = true)
-    public final void unloadAllItems(IArguments args) throws LuaException {
+    public final int unloadAllItems(IArguments args) throws LuaException {
         @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
         if (rocket == null) throw new LuaException("No rocket found");
         String filterId = parseItemId(args.optString(0, null));
+        int remaining = 0;
         for (int i = 1; i <= rocket.getInventory().getContainerSize(); i++) {
             var stack = rocket.getInventory().getItem(i - 1);
             if (stack.isEmpty()) continue;
@@ -224,7 +264,12 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
                         default -> {}
                     }
             }
+            // 全ての出力スロットが満杯等で結局移動できなかった分をカウント
+            if (!rocket.getInventory().getItem(i - 1).isEmpty()) {
+                remaining += rocket.getInventory().getItem(i - 1).getCount();
+            }
         }
+        return remaining;
     }
 
     @Nullable

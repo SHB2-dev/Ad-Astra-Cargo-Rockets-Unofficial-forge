@@ -174,6 +174,20 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
     public int getCargoFluid() { return cargoFluidTank.getFluidAmount(); }
     public int getMaxCargoFluid() { return cargoFluidTank.getCapacity(); }
 
+    public String getFuelTypeId() {
+        FluidStack fluid = fluidTank.getFluid();
+        if (fluid.isEmpty()) return "empty";
+        var key = ForgeRegistries.FLUIDS.getKey(fluid.getFluid());
+        return key != null ? key.toString() : "empty";
+    }
+
+    public String getCargoFluidTypeId() {
+        FluidStack fluid = cargoFluidTank.getFluid();
+        if (fluid.isEmpty()) return "empty";
+        var key = ForgeRegistries.FLUIDS.getKey(fluid.getFluid());
+        return key != null ? key.toString() : "empty";
+    }
+
     public Map<String, Integer> getValidDestinations() {
         if (level == null || level.getServer() == null) return new HashMap<>();
         Map<String, Integer> result = new HashMap<>();

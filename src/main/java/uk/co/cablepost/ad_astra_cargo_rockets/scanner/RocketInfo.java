@@ -17,6 +17,14 @@ public class RocketInfo {
     public String autoWaitReason;  // MOD側の自動推測（"not_enough_energy" 等）
     public List<SlotInfo> inventory = new ArrayList<>();
 
+    // 流体情報はロケット自体ではなく、現在乗っている(隣接する)ランチパッドのタンク値。
+    // ランチパッドが見つからない場合（飛行中など）はhasLaunchPad=falseで他の値は0/空。
+    public boolean hasLaunchPad;
+    public int fuel, maxFuel;
+    public String fuelType = "empty";
+    public int cargoFluid, maxCargoFluid;
+    public String cargoFluidType = "empty";
+
     public static class SlotInfo {
         public int slot;
         public String itemId;
@@ -51,6 +59,9 @@ public class RocketInfo {
         buf.writeUtf(autoWaitReason);
         buf.writeInt(inventory.size());
         for (SlotInfo s : inventory) s.write(buf);
+        buf.writeBoolean(hasLaunchPad);
+        buf.writeInt(fuel); buf.writeInt(maxFuel); buf.writeUtf(fuelType);
+        buf.writeInt(cargoFluid); buf.writeInt(maxCargoFluid); buf.writeUtf(cargoFluidType);
     }
 
     public static RocketInfo read(FriendlyByteBuf buf) {
@@ -65,6 +76,9 @@ public class RocketInfo {
         r.autoWaitReason = buf.readUtf();
         int n = buf.readInt();
         for (int i = 0; i < n; i++) r.inventory.add(SlotInfo.read(buf));
+        r.hasLaunchPad = buf.readBoolean();
+        r.fuel = buf.readInt(); r.maxFuel = buf.readInt(); r.fuelType = buf.readUtf();
+        r.cargoFluid = buf.readInt(); r.maxCargoFluid = buf.readInt(); r.cargoFluidType = buf.readUtf();
         return r;
     }
 }
