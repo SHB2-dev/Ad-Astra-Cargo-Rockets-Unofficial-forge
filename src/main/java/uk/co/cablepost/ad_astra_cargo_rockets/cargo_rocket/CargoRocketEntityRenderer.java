@@ -34,6 +34,12 @@ public class CargoRocketEntityRenderer extends EntityRenderer<CargoRocketEntity>
     }
 
     @Override
+    public boolean shouldRender(CargoRocketEntity entity, net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ) {
+        // モデルの実寸がバウンディングボックスより大きいためカリング判定を無効化
+        return true;
+    }
+
+    @Override
     public void render(CargoRocketEntity entity, float entityYaw, float partialTick,
                        PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
         super.render(entity, entityYaw, partialTick, poseStack, buffers, packedLight);

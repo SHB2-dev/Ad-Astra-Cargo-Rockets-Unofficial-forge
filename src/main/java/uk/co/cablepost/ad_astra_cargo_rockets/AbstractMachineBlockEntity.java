@@ -58,14 +58,68 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
             }
         };
 
-        ItemStackHandler handler = new ItemStackHandler(totalSlots) {
-            @Override
-            public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
-                return AbstractMachineBlockEntity.this.canPlaceItem(slot, stack);
+        // _inventory をラップする ItemStackHandler （別リストを持たず GUI と同じデータを参照）
+        IItemHandler handler = new IItemHandler() {
+            @Override public int getSlots() { return totalSlots; }
+
+            @Override public @Nonnull ItemStack getStackInSlot(int slot) {
+                return slot >= 0 && slot < _inventory.size() ? _inventory.get(slot) : ItemStack.EMPTY;
             }
-            @Override
-            protected void onContentsChanged(int slot) {
-                setChanged();
+
+            @Override public @Nonnull ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
+                if (stack.isEmpty()) return ItemStack.EMPTY;
+                if (!isItemValid(slot, stack)) return stack;
+
+                ItemStack existing = _inventory.get(slot);
+                int limit = getSlotLimit(slot);
+
+                if (!existing.isEmpty()) {
+                    if (!ItemStack.isSameItemSameTags(stack, existing)) return stack;
+                    limit -= existing.getCount();
+                }
+                if (limit <= 0) return stack;
+
+                boolean reachedLimit = stack.getCount() > limit;
+
+                if (!simulate) {
+                    if (existing.isEmpty()) {
+                        _inventory.set(slot, reachedLimit ? stack.copyWithCount(limit) : stack.copy());
+                    } else {
+                        existing.grow(reachedLimit ? limit : stack.getCount());
+                    }
+                    setChanged();
+                }
+
+                return reachedLimit ? stack.copyWithCount(stack.getCount() - limit) : ItemStack.EMPTY;
+            }
+
+            @Override public @Nonnull ItemStack extractItem(int slot, int amount, boolean simulate) {
+                if (amount == 0) return ItemStack.EMPTY;
+                ItemStack existing = _inventory.get(slot);
+                if (existing.isEmpty()) return ItemStack.EMPTY;
+
+                int toExtract = Math.min(amount, existing.getCount());
+
+                if (!simulate) {
+                    ItemStack split = existing.copy();
+                    split.setCount(toExtract);
+                    existing.shrink(toExtract);
+                    if (existing.isEmpty()) {
+                        _inventory.set(slot, ItemStack.EMPTY);
+                    }
+                    setChanged();
+                    return split;
+                } else {
+                    ItemStack split = existing.copy();
+                    split.setCount(toExtract);
+                    return split;
+                }
+            }
+
+            @Override public int getSlotLimit(int slot) { return 64; }
+
+            @Override public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
+                return AbstractMachineBlockEntity.this.canPlaceItem(slot, stack);
             }
         };
         this.itemHandler = LazyOptional.of(() -> handler);

@@ -6,6 +6,14 @@ I'm new to modding. This mod may contain many bugs. I would really appreciate it
 This mod adds cargo rockets to *Ad Astra* and, when used in conjunction with *CC:tweaked*, allows for the automation of interplanetary item transport.
 
 # Added Features
+## [v1.2.3] Rocket Scanner item + name/status API
+Added a new item, the **Rocket Scanner**, that lets you view every rocket in the world (position,
+dimension, flight state, inventory) from a single GUI without flying out to check on them.
+<br>Rockets can now be given a custom name, either from the Scanner GUI or via the new
+`setRocketName(name)` Lua function.
+<br>Scripts can also report what they're currently waiting for via the new `setRocketStatus(status)`
+Lua function, which is shown in the Scanner GUI in place of the mod's automatic guess.
+<br>See the [Rocket Scanner](#rocket-scanner) section below for details.
 ## Added particle and sound, and rework launch/landing animation
 Use ad astra's sound and particle to expression
 <br>It can now take off and land more smoothly than before.
@@ -240,6 +248,56 @@ Returns the fluid ID of the cargo fluid currently in the cargo tank.
 
 ### Returns
 - `string`: Fluid registry ID, or `"empty"` if the tank is empty.
+
+---
+
+## 📡 `setRocketStatus(status)`
+Sets a custom status string on the rocket currently sitting on this launchpad. This string is shown
+in the Rocket Scanner GUI (see below) and takes priority over the mod's automatic wait-reason guess.
+Useful for telling players exactly what your script is waiting for (e.g. `"Waiting for 64 iron ingots"`).
+
+### Parameters
+- `status` (`string`): Free-form text to display. Pass an empty string to clear it and fall back to
+  the mod's automatic inference.
+
+### Errors
+- `"No rocket found"`: No rocket is currently on the launchpad.
+
+---
+
+## 🏷️ `setRocketName(name)`
+Sets a display name on the rocket currently sitting on this launchpad. The name is shown in the
+Rocket Scanner GUI's rocket list, and can also be set/edited manually from the GUI itself.
+
+### Parameters
+- `name` (`string`): Name to display (max 32 characters; longer names are truncated).
+
+### Errors
+- `"No rocket found"`: No rocket is currently on the launchpad.
+
+---
+
+# 🔍 Rocket Scanner
+
+The **Rocket Scanner** is a new item that lets you keep track of every cargo rocket in the world
+without needing to fly out and check on them manually.
+
+Right-click with the Rocket Scanner in hand to open the scanner GUI. The left panel lists every
+rocket currently loaded in the world (across all dimensions), showing its name and position.
+Selecting a rocket from the list shows:
+
+- **Position & dimension** — where the rocket currently is.
+- **Flight state** — `Grounded`, `Ascending`, or `Descending`.
+- **Waiting on** — why the rocket is sitting on the pad. This is either:
+  - a message your Lua script explicitly set via `setRocketStatus(status)`, or
+  - the mod's own best guess (`Not enough energy`, `Not enough fuel`, `Ready (idle)`, etc.) based on
+    the nearby launchpad's current energy/fuel levels, if no script-provided status is set.
+- **Inventory** — every item currently aboard the rocket, slot by slot.
+- **Name field** — a text box to rename the rocket directly from the GUI. Renaming here has the same
+  effect as calling `setRocketName(name)` from a script.
+
+The list refreshes automatically every couple of seconds while the GUI is open, or you can press the
+**Refresh** button to update immediately.
 
 ---
 

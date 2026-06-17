@@ -40,6 +40,10 @@ public class AdAstraCargoRockets {
     public static final RegistryObject<CargoRocketItem> CARGO_ROCKET_TIER_4_ITEM =
             ITEMS.register("cargo_rocket_tier_4", () -> new CargoRocketItem(new Item.Properties().stacksTo(1), 4));
 
+    public static final RegistryObject<uk.co.cablepost.ad_astra_cargo_rockets.scanner.RocketScannerItem> ROCKET_SCANNER_ITEM =
+            ITEMS.register("rocket_scanner", () ->
+                new uk.co.cablepost.ad_astra_cargo_rockets.scanner.RocketScannerItem(new Item.Properties().stacksTo(1)));
+
     public static final RegistryObject<EntityType<CargoRocketEntity>> CARGO_ROCKET_ENTITY =
             ENTITY_TYPES.register("cargo_rocket", () ->
                 EntityType.Builder.<CargoRocketEntity>of(CargoRocketEntity::new, MobCategory.MISC)
@@ -69,6 +73,7 @@ public class AdAstraCargoRockets {
         bus.addListener(AdAstraCargoRocketsClient::clientSetup);
 
         ModConfig.load();
+        uk.co.cablepost.ad_astra_cargo_rockets.scanner.ScannerNetwork.register();
     }
 
     private void setup(FMLCommonSetupEvent event) {
@@ -87,6 +92,7 @@ public class AdAstraCargoRockets {
             event.accept(CARGO_ROCKET_TIER_2_ITEM.get());
             event.accept(CARGO_ROCKET_TIER_3_ITEM.get());
             event.accept(CARGO_ROCKET_TIER_4_ITEM.get());
+            event.accept(ROCKET_SCANNER_ITEM.get());
         }
     }
 }

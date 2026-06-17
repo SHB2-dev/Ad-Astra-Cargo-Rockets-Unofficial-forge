@@ -148,6 +148,20 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     public void destroyRocket() { blockEntity.destroyRocket(); }
 
     @LuaFunction(mainThread = true)
+    public final void setRocketStatus(String status) throws LuaException {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        if (rocket == null) throw new LuaException("No rocket found");
+        rocket.statusOverride = status == null ? "" : status;
+    }
+
+    @LuaFunction(mainThread = true)
+    public final void setRocketName(String name) throws LuaException {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        if (rocket == null) throw new LuaException("No rocket found");
+        rocket.setRocketName(name);
+    }
+
+    @LuaFunction(mainThread = true)
     public final int getFuel() { return blockEntity.getFuel(); }
 
     @LuaFunction(mainThread = true)

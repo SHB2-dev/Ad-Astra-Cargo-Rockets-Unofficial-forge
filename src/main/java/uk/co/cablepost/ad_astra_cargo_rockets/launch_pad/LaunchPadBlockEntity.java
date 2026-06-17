@@ -190,6 +190,36 @@ public class LaunchPadBlockEntity extends AbstractFluidMachineBlockEntity implem
         if (r != null) r.killRocket();
     }
 
+    /**
+     * ロケットが地上で待機している理由を、ランチパッドの現在値から自動推測する。
+     * Lua側がCargoRocketEntity.statusOverrideを明示的にセットしている場合はそちらが優先される
+     * （Scanner GUI側で判定する）。
+     */
+    public String inferWaitReason() {
+        CargoRocketEntity rocket = getRocket();
+        if (rocket == null) return "no_rocket";
+        if (!"grounded".equals(rocket.getFlightState())) return "in_flight";
+
+        // 想定される最低難易度（Tier1相当）でエネルギー・燃料の不足を粗く判定する。
+        // 実際の目的地はLuaスクリプト側しか知らないため、これは目安の判定。
+        int approxDifficulty = 1;
+        if (_energyStorage.getEnergyStored() < (long) getEnergyRequiredForLaunch() * approxDifficulty) {
+            return "not_enough_energy";
+        }
+        FluidStack fluid = fluidTank.getFluid();
+        double perf = 1.0;
+        if (!fluid.isEmpty()) {
+            String fluidId = ForgeRegistries.FLUIDS.getKey(fluid.getFluid()).toString();
+            perf = ModConfig.INSTANCE.fuels.getOrDefault(fluidId, 1.0);
+            if (perf <= 0) perf = 1.0;
+        }
+        int approxFuelNeeded = (int) ((getFuelRequiredForLaunch() * approxDifficulty) / perf);
+        if (fluidTank.getFluidAmount() < approxFuelNeeded) {
+            return "not_enough_fuel";
+        }
+        return "idle";
+    }
+
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
         return !stack.is(DENIED_ITEMS);

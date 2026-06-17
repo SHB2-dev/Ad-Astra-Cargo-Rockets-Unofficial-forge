@@ -29,6 +29,11 @@ import java.util.Objects;
 
 public class CargoRocketEntity extends Entity {
     public String targetPlanet = "";
+    // Lua側から明示的に送られた状態（優先表示）。空ならMOD側で自動推測する。
+    public String statusOverride = "";
+
+    private static final EntityDataAccessor<String> TRACKED_NAME =
+            SynchedEntityData.defineId(CargoRocketEntity.class, EntityDataSerializers.STRING);
 
     private final net.minecraft.core.NonNullList<ItemStack> inventory =
             net.minecraft.core.NonNullList.withSize(9, ItemStack.EMPTY);
@@ -45,16 +50,28 @@ public class CargoRocketEntity extends Entity {
     }
 
     @Override
+    public net.minecraft.world.phys.AABB getBoundingBoxForCulling() {
+        // モデルの実寸はバウンディングボックスより大きいため、カリング用に拡大
+        return super.getBoundingBoxForCulling().inflate(2.0, 2.0, 2.0);
+    }
+
+    @Override
     protected void defineSynchedData() {
         this.entityData.define(TRACKED_TIER, 0);
         this.entityData.define(TRACKED_LAUNCH_TICKS, 0);
+        this.entityData.define(TRACKED_NAME, "");
     }
+
+    public void setRocketName(String name) { entityData.set(TRACKED_NAME, name == null ? "" : name); }
+    public String getRocketName() { return entityData.get(TRACKED_NAME); }
 
     @Override
     public void readAdditionalSaveData(CompoundTag nbt) {
         entityData.set(TRACKED_TIER, nbt.getInt("Tier"));
         entityData.set(TRACKED_LAUNCH_TICKS, nbt.getInt("LaunchTicks"));
         targetPlanet = nbt.getString("TargetPlanet");
+        entityData.set(TRACKED_NAME, nbt.getString("RocketName"));
+        statusOverride = nbt.getString("StatusOverride");
         ContainerHelper.loadAllItems(nbt, inventory);
     }
 
@@ -63,6 +80,8 @@ public class CargoRocketEntity extends Entity {
         nbt.putInt("Tier", entityData.get(TRACKED_TIER));
         nbt.putInt("LaunchTicks", entityData.get(TRACKED_LAUNCH_TICKS));
         nbt.putString("TargetPlanet", targetPlanet);
+        nbt.putString("RocketName", entityData.get(TRACKED_NAME));
+        nbt.putString("StatusOverride", statusOverride);
         ContainerHelper.saveAllItems(nbt, inventory);
     }
 
@@ -70,6 +89,13 @@ public class CargoRocketEntity extends Entity {
     public int getTier() { return entityData.get(TRACKED_TIER); }
     public void setLaunchTicks(int ticks) { entityData.set(TRACKED_LAUNCH_TICKS, ticks); }
     public int getLaunchTicks() { return entityData.get(TRACKED_LAUNCH_TICKS); }
+
+    /** ロケットの物理的な飛行状態（自動判定）。Scanner GUIの表示に使う。 */
+    public String getFlightState() {
+        if (!targetPlanet.isEmpty()) return "ascending";
+        if (getDeltaMovement().y < -0.05) return "descending";
+        return "grounded";
+    }
 
     // 固定インスタンス - 毎回生成すると変更が失われる
     private final net.minecraft.world.SimpleContainer inventoryContainer = new net.minecraft.world.SimpleContainer(9) {
@@ -277,6 +303,7 @@ public class CargoRocketEntity extends Entity {
             if (world.dimension().location().toString().equals(targetPlanet)) { targetWorld = world; break; }
         }
         targetPlanet = "";
+        statusOverride = ""; // 到着後は古い状態表示を持ち越さない
         if (targetWorld == null || targetWorld.equals(level())) return;
         Entity spawned = getType().create(targetWorld);
         if (spawned != null) {
