@@ -109,9 +109,11 @@ public class RocketMenu extends net.minecraft.world.inventory.AbstractContainerM
                     || stack.getItem() == net.minecraft.world.item.Items.BUCKET;
         }
 
+        private boolean converting = false;
+
         @Override
-        public void setByPlayer(ItemStack newStack, ItemStack oldStack) {
-            super.setByPlayer(newStack, oldStack);
+        public void set(ItemStack stack) {
+            super.set(stack);
             tryConvert();
         }
 
@@ -121,35 +123,45 @@ public class RocketMenu extends net.minecraft.world.inventory.AbstractContainerM
             tryConvert();
         }
 
-        /** 置かれたバケツをタンクとの間で変換できるなら変換する。 */
+        /**
+         * 置かれたバケツをタンクとの間で変換できるなら変換する。
+         * converting フラグで再入を防止する（変換時の set()/setChanged() 呼び出しが
+         * 再度このメソッドを呼び、満タン→空→満タン...と無限再帰するのを防ぐため）。
+         */
         private void tryConvert() {
+            if (converting) return;
             ItemStack current = getItem();
             if (current.isEmpty()) return;
 
-            if (current.getItem() == net.minecraft.world.item.Items.BUCKET) {
-                // 空バケツ -> タンクから1バケツ(1000mB)汲み出して満タンバケツに変える
-                if (tank.getFluidAmount() >= 1000) {
-                    var drained = tank.drain(1000, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
-                    if (drained.getAmount() == 1000) {
-                        var bucketItem = drained.getFluid().getBucket();
-                        if (bucketItem != null) {
-                            set(new ItemStack(bucketItem));
-                        } else {
-                            // バケツアイテムが定義されていない流体は汲み出せない(注ぎ戻す)
-                            tank.fill(drained, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+            converting = true;
+            try {
+                if (current.getItem() == net.minecraft.world.item.Items.BUCKET) {
+                    // 空バケツ -> タンクから1バケツ(1000mB)汲み出して満タンバケツに変える
+                    if (tank.getFluidAmount() >= 1000) {
+                        var drained = tank.drain(1000, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                        if (drained.getAmount() == 1000) {
+                            var bucketItem = drained.getFluid().getBucket();
+                            if (bucketItem != null) {
+                                set(new ItemStack(bucketItem));
+                            } else {
+                                // バケツアイテムが定義されていない流体は汲み出せない(注ぎ戻す)
+                                tank.fill(drained, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                            }
+                        }
+                    }
+                } else if (current.getItem() instanceof net.minecraft.world.item.BucketItem bucketItem) {
+                    // 満タンのバケツ -> タンクに注いで空バケツに変える
+                    net.minecraftforge.fluids.FluidStack toFill = bucketItemToFluidStack(bucketItem);
+                    if (!toFill.isEmpty()) {
+                        int accepted = tank.fill(toFill.copy(), net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE);
+                        if (accepted == 1000) {
+                            tank.fill(toFill, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                            set(new ItemStack(net.minecraft.world.item.Items.BUCKET));
                         }
                     }
                 }
-            } else if (current.getItem() instanceof net.minecraft.world.item.BucketItem bucketItem) {
-                // 満タンのバケツ -> タンクに注いで空バケツに変える
-                net.minecraftforge.fluids.FluidStack toFill = bucketItemToFluidStack(bucketItem);
-                if (!toFill.isEmpty()) {
-                    int accepted = tank.fill(toFill.copy(), net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE);
-                    if (accepted == 1000) {
-                        tank.fill(toFill, net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
-                        set(new ItemStack(net.minecraft.world.item.Items.BUCKET));
-                    }
-                }
+            } finally {
+                converting = false;
             }
         }
 
