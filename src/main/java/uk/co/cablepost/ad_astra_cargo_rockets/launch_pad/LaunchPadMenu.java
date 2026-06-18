@@ -10,6 +10,11 @@ import net.minecraft.world.item.ItemStack;
 import javax.annotation.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.AdAstraCargoRockets;
 
+/**
+ * ランチパッドのメニュー。
+ * v1.2.4でアイテム/燃料/カーゴ流体はロケット自身のGUIに移管されたため、
+ * ここではエネルギー残量の表示のみを行う（アイテムスロットは無し）。
+ */
 public class LaunchPadMenu extends AbstractContainerMenu {
 
     @Nullable private final LaunchPadBlockEntity blockEntity;
@@ -17,8 +22,7 @@ public class LaunchPadMenu extends AbstractContainerMenu {
 
     // 各値を上位・下位に分割してshortの制限を回避
     // [0]=energy上位, [1]=energy下位, [2]=maxEnergy上位, [3]=maxEnergy下位
-    // [4]=fuel, [5]=maxFuel
-    private static final int DATA_COUNT = 8;
+    private static final int DATA_COUNT = 4;
 
     public LaunchPadMenu(int syncId, Inventory playerInventory, @Nullable LaunchPadBlockEntity blockEntity) {
         super(AdAstraCargoRockets.LAUNCH_PAD.getMenuType().get(), syncId);
@@ -31,10 +35,6 @@ public class LaunchPadMenu extends AbstractContainerMenu {
                     case 1 -> blockEntity.getEnergy() & 0xFFFF;
                     case 2 -> blockEntity.getMaxEnergy() >> 16;
                     case 3 -> blockEntity.getMaxEnergy() & 0xFFFF;
-                    case 4 -> blockEntity.getFuel();
-                    case 5 -> blockEntity.getMaxFuel();
-                    case 6 -> blockEntity.getCargoFluid();
-                    case 7 -> blockEntity.getMaxCargoFluid();
                     default -> 0;
                 };
             }
@@ -44,15 +44,6 @@ public class LaunchPadMenu extends AbstractContainerMenu {
         addDataSlots(data);
         // 初回同期を強制
         broadcastChanges();
-
-        if (blockEntity != null) {
-            for (int i = 0; i < 9; i++)
-                addSlot(new Slot(blockEntity, i, 8 + i*18, LaunchPadScreen.SLOT0_Y));
-            for (int i = 0; i < 9; i++)
-                addSlot(new Slot(blockEntity, 9+i, 8 + i*18, LaunchPadScreen.SLOT1_Y) {
-                    @Override public boolean mayPlace(ItemStack s) { return false; }
-                });
-        }
 
         for (int row = 0; row < 3; row++)
             for (int col = 0; col < 9; col++)
@@ -72,15 +63,6 @@ public class LaunchPadMenu extends AbstractContainerMenu {
 
     public int getEnergy()    { return reconstruct(0, 1); }
     public int getMaxEnergy() { return reconstruct(2, 3); }
-    public int getFuel()         { return data.get(4) & 0xFFFF; }
-    public int getMaxFuel()      { return data.get(5) & 0xFFFF; }
-    public int getCargoFluid()   { return data.get(6) & 0xFFFF; }
-    public int getMaxCargoFluid(){ return data.get(7) & 0xFFFF; }
-
-    @Override
-    public void broadcastChanges() {
-        super.broadcastChanges();
-    }
 
     @Override public boolean stillValid(Player p) {
         return blockEntity == null || blockEntity.stillValid(p);
@@ -91,9 +73,8 @@ public class LaunchPadMenu extends AbstractContainerMenu {
         Slot slot = slots.get(index);
         if (!slot.hasItem()) return ItemStack.EMPTY;
         ItemStack stack = slot.getItem(), result = stack.copy();
-        int cs = blockEntity != null ? 18 : 0;
-        if (index < cs) { if (!moveItemStackTo(stack, cs, slots.size(), true))  return ItemStack.EMPTY; }
-        else            { if (!moveItemStackTo(stack, 0, 9, false))              return ItemStack.EMPTY; }
+        // プレイヤーインベントリ同士でのみ移動可能（ランチパッド側にスロットが無いため）
+        if (!moveItemStackTo(stack, 0, slots.size(), false)) return ItemStack.EMPTY;
         if (stack.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged();
         return result;
     }

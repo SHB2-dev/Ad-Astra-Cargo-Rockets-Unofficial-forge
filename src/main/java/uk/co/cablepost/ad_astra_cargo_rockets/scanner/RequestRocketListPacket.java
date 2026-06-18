@@ -47,12 +47,31 @@ public class RequestRocketListPacket {
                     info.tier = rocket.getTier();
                     info.flightState = rocket.getFlightState();
                     info.statusOverride = rocket.statusOverride;
+                    info.targetPlanet = rocket.targetPlanet;
 
-                    // 隣接するランチパッドがあれば自動推測の待機理由を取得
-                    String autoReason = "unknown";
-                    var be = findAdjacentLaunchPad(level, rocket);
-                    if (be != null) autoReason = be.inferWaitReason();
+                    // 隣接ランチパッドの検索は飛行中なら無意味なのでスキップする
+                    // （上空にいるロケットの近くにランチパッドは無いのが正常なので、
+                    // 探索コストを省きつつ "unknown" へのフォールバックも防ぐ）。
+                    LaunchPadBlockEntity adjacentPad = "grounded".equals(info.flightState)
+                            ? findAdjacentLaunchPad(level, rocket) : null;
+
+                    String autoReason;
+                    if (!"grounded".equals(info.flightState)) {
+                        autoReason = "in_flight";
+                    } else {
+                        autoReason = adjacentPad != null ? adjacentPad.inferWaitReason() : "no_launchpad";
+                    }
                     info.autoWaitReason = autoReason;
+                    info.hasLaunchPad = adjacentPad != null;
+
+                    // 燃料・カーゴ流体はv1.2.4でロケット自身のタンクに移管されたため、
+                    // ランチパッドの有無に関わらず常に取得できる（飛行中も表示可能）。
+                    info.fuel = rocket.fuelTank.getFluidAmount();
+                    info.maxFuel = rocket.fuelTank.getCapacity();
+                    info.fuelType = fluidTypeId(rocket.fuelTank.getFluid());
+                    info.cargoFluid = rocket.cargoFluidTank.getFluidAmount();
+                    info.maxCargoFluid = rocket.cargoFluidTank.getCapacity();
+                    info.cargoFluidType = fluidTypeId(rocket.cargoFluidTank.getFluid());
 
                     for (int i = 0; i < rocket.getInventory().getContainerSize(); i++) {
                         var stack = rocket.getInventory().getItem(i);
@@ -91,5 +110,11 @@ public class RequestRocketListPacket {
             }
         }
         return null;
+    }
+
+    private static String fluidTypeId(net.minecraftforge.fluids.FluidStack fluid) {
+        if (fluid.isEmpty()) return "empty";
+        var key = ForgeRegistries.FLUIDS.getKey(fluid.getFluid());
+        return key != null ? key.toString() : "empty";
     }
 }

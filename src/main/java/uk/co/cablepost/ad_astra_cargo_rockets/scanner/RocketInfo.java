@@ -15,7 +15,16 @@ public class RocketInfo {
     public String flightState;     // "grounded" / "ascending" / "descending" / "in_flight"
     public String statusOverride;  // Luaから送られた状態文字列（空なら自動推測を使う）
     public String autoWaitReason;  // MOD側の自動推測（"not_enough_energy" 等）
+    public String targetPlanet;    // 飛行中の目的地ディメンションID。地上では空文字。
     public List<SlotInfo> inventory = new ArrayList<>();
+
+    // 燃料・カーゴ流体はv1.2.4でロケット自身のタンクに移管されたため、飛行中でも
+    // 常に取得できる（hasLaunchPadは「待機理由」の判定に使う隣接ランチパッドの有無のみを表す）。
+    public boolean hasLaunchPad;
+    public int fuel, maxFuel;
+    public String fuelType = "empty";
+    public int cargoFluid, maxCargoFluid;
+    public String cargoFluidType = "empty";
 
     public static class SlotInfo {
         public int slot;
@@ -49,8 +58,12 @@ public class RocketInfo {
         buf.writeUtf(flightState);
         buf.writeUtf(statusOverride);
         buf.writeUtf(autoWaitReason);
+        buf.writeUtf(targetPlanet == null ? "" : targetPlanet);
         buf.writeInt(inventory.size());
         for (SlotInfo s : inventory) s.write(buf);
+        buf.writeBoolean(hasLaunchPad);
+        buf.writeInt(fuel); buf.writeInt(maxFuel); buf.writeUtf(fuelType);
+        buf.writeInt(cargoFluid); buf.writeInt(maxCargoFluid); buf.writeUtf(cargoFluidType);
     }
 
     public static RocketInfo read(FriendlyByteBuf buf) {
@@ -63,8 +76,12 @@ public class RocketInfo {
         r.flightState = buf.readUtf();
         r.statusOverride = buf.readUtf();
         r.autoWaitReason = buf.readUtf();
+        r.targetPlanet = buf.readUtf();
         int n = buf.readInt();
         for (int i = 0; i < n; i++) r.inventory.add(SlotInfo.read(buf));
+        r.hasLaunchPad = buf.readBoolean();
+        r.fuel = buf.readInt(); r.maxFuel = buf.readInt(); r.fuelType = buf.readUtf();
+        r.cargoFluid = buf.readInt(); r.maxCargoFluid = buf.readInt(); r.cargoFluidType = buf.readUtf();
         return r;
     }
 }

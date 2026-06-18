@@ -32,6 +32,22 @@ public class CargoRocketEntity extends Entity {
     // Lua側から明示的に送られた状態（優先表示）。空ならMOD側で自動推測する。
     public String statusOverride = "";
 
+    /** 32 buckets = 32000 mB （ランチパッド側と同じ容量） */
+    public static final int FUEL_CAPACITY = 32000;
+    public static final int CARGO_FLUID_CAPACITY = 32000;
+
+    // ロケット自身が燃料タンクとカーゴ流体タンクを持つ。以前はランチパッド側にあり、
+    // 発射後も出発地に残ったままになる（着陸先で値が消えたように見える）バグの
+    // 原因だったため、積荷として完全にロケット側へ移した。
+    public final net.minecraftforge.fluids.capability.templates.FluidTank fuelTank =
+            new net.minecraftforge.fluids.capability.templates.FluidTank(FUEL_CAPACITY) {
+                @Override public boolean isFluidValid(net.minecraftforge.fluids.FluidStack stack) { return true; }
+            };
+    public final net.minecraftforge.fluids.capability.templates.FluidTank cargoFluidTank =
+            new net.minecraftforge.fluids.capability.templates.FluidTank(CARGO_FLUID_CAPACITY) {
+                @Override public boolean isFluidValid(net.minecraftforge.fluids.FluidStack stack) { return true; }
+            };
+
     private static final EntityDataAccessor<String> TRACKED_NAME =
             SynchedEntityData.defineId(CargoRocketEntity.class, EntityDataSerializers.STRING);
 
@@ -44,6 +60,10 @@ public class CargoRocketEntity extends Entity {
             SynchedEntityData.defineId(CargoRocketEntity.class, EntityDataSerializers.INT);
 
     private boolean hasPlayedLandingSound = false;
+    // grounded状態になった瞬間のゲームタイム(tick)。-1なら未設定(まだ飛行中、または記録前)。
+    // 「発射からの固定秒数」ではなく「実際に止まってからの経過時間」で待機判定するためのもの。
+    private long groundedSinceTick = -1;
+    private String lastFlightState = "";
 
     public CargoRocketEntity(EntityType<?> type, Level level) {
         super(type, level);
@@ -72,7 +92,14 @@ public class CargoRocketEntity extends Entity {
         targetPlanet = nbt.getString("TargetPlanet");
         entityData.set(TRACKED_NAME, nbt.getString("RocketName"));
         statusOverride = nbt.getString("StatusOverride");
+        if (nbt.contains("FuelTank")) fuelTank.readFromNBT(nbt.getCompound("FuelTank"));
+        if (nbt.contains("CargoFluidTank")) cargoFluidTank.readFromNBT(nbt.getCompound("CargoFluidTank"));
         ContainerHelper.loadAllItems(nbt, inventory);
+        if (nbt.contains("BucketSlotsData")) {
+            net.minecraft.core.NonNullList<ItemStack> tmp = net.minecraft.core.NonNullList.withSize(2, ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(nbt.getCompound("BucketSlotsData"), tmp);
+            for (int i = 0; i < 2; i++) bucketSlots.set(i, tmp.get(i));
+        }
     }
 
     @Override
@@ -82,7 +109,16 @@ public class CargoRocketEntity extends Entity {
         nbt.putString("TargetPlanet", targetPlanet);
         nbt.putString("RocketName", entityData.get(TRACKED_NAME));
         nbt.putString("StatusOverride", statusOverride);
+        CompoundTag fuelTag = new CompoundTag();
+        fuelTank.writeToNBT(fuelTag);
+        nbt.put("FuelTank", fuelTag);
+        CompoundTag cargoTag = new CompoundTag();
+        cargoFluidTank.writeToNBT(cargoTag);
+        nbt.put("CargoFluidTank", cargoTag);
         ContainerHelper.saveAllItems(nbt, inventory);
+        CompoundTag bucketSaveTag = new CompoundTag();
+        ContainerHelper.saveAllItems(bucketSaveTag, bucketSlots);
+        nbt.put("BucketSlotsData", bucketSaveTag);
     }
 
     public void setTier(int tier) { entityData.set(TRACKED_TIER, tier); }
@@ -125,6 +161,39 @@ public class CargoRocketEntity extends Entity {
         return inventoryContainer;
     }
 
+    // 燃料バケツ・カーゴ流体バケツを置くための2スロット専用コンテナ([0]=燃料, [1]=カーゴ)。
+    // ここに満タンのバケツを置くとfuelTank/cargoFluidTankに注がれ空バケツに変わり、
+    // 空バケツを置くとタンクから汲み出して満タンバケツに変わる(RocketMenu側で処理)。
+    private final net.minecraft.core.NonNullList<ItemStack> bucketSlots =
+            net.minecraft.core.NonNullList.withSize(2, ItemStack.EMPTY);
+
+    private final net.minecraft.world.SimpleContainer bucketContainer = new net.minecraft.world.SimpleContainer(2) {
+        @Override public ItemStack getItem(int slot) { return bucketSlots.get(slot); }
+        @Override public void setItem(int slot, ItemStack stack) { bucketSlots.set(slot, stack); setChanged(); }
+        @Override public int getContainerSize() { return 2; }
+        @Override public boolean isEmpty() { return bucketSlots.stream().allMatch(ItemStack::isEmpty); }
+        @Override public ItemStack removeItem(int slot, int amount) {
+            ItemStack stack = bucketSlots.get(slot);
+            if (stack.isEmpty()) return ItemStack.EMPTY;
+            ItemStack split = stack.split(amount);
+            if (stack.isEmpty()) bucketSlots.set(slot, ItemStack.EMPTY);
+            setChanged();
+            return split;
+        }
+        @Override public ItemStack removeItemNoUpdate(int slot) {
+            ItemStack old = bucketSlots.get(slot);
+            bucketSlots.set(slot, ItemStack.EMPTY);
+            return old;
+        }
+        @Override public void clearContent() {
+            for (int i = 0; i < 2; i++) bucketSlots.set(i, ItemStack.EMPTY);
+        }
+    };
+
+    public net.minecraft.world.SimpleContainer getBucketSlots() {
+        return bucketContainer;
+    }
+
     @Override public boolean canBeCollidedWith() { return true; }
     @Override public boolean isPushable() { return false; }
     // プレイヤーが殴って攻撃できるようにする
@@ -133,7 +202,30 @@ public class CargoRocketEntity extends Entity {
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        return InteractionResult.PASS;
+        if (level().isClientSide) return InteractionResult.SUCCESS;
+        if (!"grounded".equals(getFlightState())) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    "The rocket must be grounded to open its inventory."), true);
+            return InteractionResult.FAIL;
+        }
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            net.minecraftforge.network.NetworkHooks.openScreen(serverPlayer,
+                    new net.minecraft.world.MenuProvider() {
+                        @Override
+                        public net.minecraft.network.chat.Component getDisplayName() {
+                            String name = getRocketName();
+                            return net.minecraft.network.chat.Component.literal(
+                                    name != null && !name.isEmpty() ? name : "Cargo Rocket");
+                        }
+                        @Override
+                        public @javax.annotation.Nullable net.minecraft.world.inventory.AbstractContainerMenu createMenu(
+                                int syncId, net.minecraft.world.entity.player.Inventory playerInventory, Player p) {
+                            return new RocketMenu(syncId, playerInventory, CargoRocketEntity.this);
+                        }
+                    },
+                    buf -> buf.writeVarInt(getId()));
+        }
+        return InteractionResult.CONSUME;
     }
 
     private void dropInventory() {
@@ -141,6 +233,10 @@ public class CargoRocketEntity extends Entity {
         for (int i = 0; i < inventory.size(); i++) {
             spawnAtLocation(inventory.get(i));
             inventory.set(i, ItemStack.EMPTY);
+        }
+        for (int i = 0; i < bucketSlots.size(); i++) {
+            spawnAtLocation(bucketSlots.get(i));
+            bucketSlots.set(i, ItemStack.EMPTY);
         }
     }
 
@@ -227,8 +323,24 @@ public class CargoRocketEntity extends Entity {
     }
 
     private void serverTick() {
+        // 状態がgroundedに変わった瞬間(=実際に止まった瞬間)を記録する。
+        // 「発射からの固定秒数」ではなく、ここからの経過時間で待機判定できるようにする。
+        String currentState = getFlightState();
+        if ("grounded".equals(currentState) && !"grounded".equals(lastFlightState)) {
+            groundedSinceTick = level().getGameTime();
+        } else if (!"grounded".equals(currentState)) {
+            groundedSinceTick = -1;
+        }
+        lastFlightState = currentState;
+
+        // 同じ高度帯（上下2マス以内）に別のロケットが重なっている場合のみ衝突とみなす。
+        // 以前はXZ平面だけの判定だったため、ディメンション移動直後に高高度
+        // (targetWorld.getMaxBuildHeight()+200)へ出現した瞬間、地表近くに駐機している
+        // 別のロケットと誤って衝突判定されてしまうことがあった（月などで頻発していた
+        // 「着陸すると破壊される」バグの一因）。
         List<CargoRocketEntity> intersecting = level().getEntitiesOfClass(
-                CargoRocketEntity.class, new AABB(blockPosition()).inflate(2), e -> e.isAlive() && e.getId() != getId());
+                CargoRocketEntity.class, new AABB(blockPosition()).inflate(2, 2, 2),
+                e -> e.isAlive() && e.getId() != getId());
         if (!intersecting.isEmpty()) {
             level().explode(this, getX(), getY() + 2, getZ(), 5, Level.ExplosionInteraction.MOB);
             dropInventory(); dropSelf(); kill(); return;
@@ -236,11 +348,22 @@ public class CargoRocketEntity extends Entity {
         if (targetPlanet.isEmpty()) { descentTick(); } else { ascentTick(); }
     }
 
+    /** 止まってからの経過秒数。まだ止まっていない(飛行中)場合は0。 */
+    public int getSecondsSinceGrounded() {
+        if (groundedSinceTick < 0 || level() == null) return 0;
+        long elapsedTicks = level().getGameTime() - groundedSinceTick;
+        return (int) Math.max(0, elapsedTicks / 20);
+    }
+
     private void descentTick() {
         setLaunchTicks(0);
+        // 自分の直下、同じXZ位置の半径1マス以内に「地上で停止している」別のロケットが
+        // いる場合のみ衝突とみなす。以前はbelow(3)±2マスという広い範囲で判定していたため、
+        // 月など複数のロケットが行き来する場所では、駐機中のロケットの上空を通過するだけで
+        // 誤って爆発・破壊されてしまっていた（「月に着くとロケットが破壊される」バグの本体）。
         List<CargoRocketEntity> below = level().getEntitiesOfClass(
-                CargoRocketEntity.class, new AABB(blockPosition().below(3)).inflate(2),
-                e -> e.isAlive() && e.getId() != getId());
+                CargoRocketEntity.class, new AABB(blockPosition().below(2)).inflate(1, 1, 1),
+                e -> e.isAlive() && e.getId() != getId() && "grounded".equals(e.getFlightState()));
         if (!below.isEmpty()) {
             level().explode(this, getX(), getY() - 0.5, getZ(), 5, Level.ExplosionInteraction.MOB);
             dropInventory(); dropSelf(); kill(); return;

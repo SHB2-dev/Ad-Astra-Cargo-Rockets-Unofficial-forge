@@ -12,6 +12,7 @@ public class AdAstraCargoRocketsClient {
         event.enqueueWork(() -> {
             EntityRenderers.register(AdAstraCargoRockets.CARGO_ROCKET_ENTITY.get(), CargoRocketEntityRenderer::new);
             AdAstraCargoRockets.LAUNCH_PAD.clientSetup();
+            AdAstraCargoRockets.CARGO_ROCKET_MENU.clientSetup();
         });
     }
 }

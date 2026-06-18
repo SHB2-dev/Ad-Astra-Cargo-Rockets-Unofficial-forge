@@ -51,6 +51,8 @@ public class AdAstraCargoRockets {
                     .build(MOD_ID + ":cargo_rocket"));
 
     public static final LaunchPadInit LAUNCH_PAD = new LaunchPadInit();
+    public static final uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketInit CARGO_ROCKET_MENU =
+            new uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketInit();
 
     public static final RegistryObject<CreativeModeTab> ITEM_GROUP =
             CREATIVE_TABS.register("main_creative_inventory_tab", () ->
@@ -67,6 +69,7 @@ public class AdAstraCargoRockets {
         BLOCK_ENTITY_TYPES.register(bus);
         CREATIVE_TABS.register(bus);
         LAUNCH_PAD.register(bus);
+        CARGO_ROCKET_MENU.register(bus);
 
         bus.addListener(this::setup);
         bus.addListener(this::buildCreativeTab);

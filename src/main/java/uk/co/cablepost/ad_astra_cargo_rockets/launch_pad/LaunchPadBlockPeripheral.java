@@ -1,6 +1,5 @@
 package uk.co.cablepost.ad_astra_cargo_rockets.launch_pad;
 
-import dan200.computercraft.api.lua.IArguments;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IComputerAccess;
@@ -13,11 +12,18 @@ import net.minecraftforge.registries.ForgeRegistries;
 import javax.annotation.Nullable;
 import uk.co.cablepost.ad_astra_cargo_rockets.cargo_rocket.CargoRocketEntity;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
+/**
+ * ランチパッドのCC:Tweaked API。
+ *
+ * v1.2.4でアイテム/燃料/カーゴ流体の実体はロケット自身が持つようになったため、
+ * ランチパッド↔ロケット間で「移動」させるAPI(loadAllItems/unloadAllItems/
+ * moveItemsFrom...等)は廃止した。ランチパッドのパイプ・ホッパー接続自体は
+ * そのまま残っており、着地中のロケットのタンク/インベントリへ直結する
+ * （LaunchPadBlockEntity.getCapability参照）。getFuel()/getCargoFluid()等は
+ * 常にロケット自身のタンクの値を返す。
+ */
 public class LaunchPadBlockPeripheral implements IPeripheral {
 
     private final LaunchPadBlockEntity blockEntity;
@@ -59,28 +65,6 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     }
 
     @LuaFunction(mainThread = true)
-    public final void moveItemsFromRocketToLaunchPad(int rocketSlot, int launchPadSlot) throws LuaException {
-        @Nullable ItemMoveFailReason r = blockEntity.moveStackFromRocketToLaunchPad(rocketSlot, launchPadSlot);
-        if (r == null) return;
-        switch (r) {
-            case NO_ROCKET -> throw new LuaException("No rocket found");
-            case TARGET_FULL -> throw new LuaException("Destination full");
-            case INVALID_SLOT -> throw new LuaException("Invalid slot");
-        }
-    }
-
-    @LuaFunction(mainThread = true)
-    public final void moveItemsFromLaunchPadToRocket(int launchPadSlot, int rocketSlot) throws LuaException {
-        @Nullable ItemMoveFailReason r = blockEntity.moveStackFromLaunchPadToRocket(launchPadSlot, rocketSlot);
-        if (r == null) return;
-        switch (r) {
-            case NO_ROCKET -> throw new LuaException("No rocket found");
-            case TARGET_FULL -> throw new LuaException("Destination full");
-            case INVALID_SLOT -> throw new LuaException("Invalid slot");
-        }
-    }
-
-    @LuaFunction(mainThread = true)
     public final int getEnergyRequiredForLaunch() { return blockEntity.getEnergyRequiredForLaunch(); }
 
     @LuaFunction(mainThread = true)
@@ -96,52 +80,29 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     public final Map<String, Integer> getValidDestinations() { return blockEntity.getValidDestinations(); }
 
     @LuaFunction(mainThread = true)
-    public Map<Integer, Map<String, ?>> listLaunchPadInventory() {
-        Map<Integer, Map<String, ?>> result = new HashMap<>();
-        for (int i = 0; i < blockEntity.getContainerSize(); i++) {
-            var stack = blockEntity.getStack(i);
-            if (!stack.isEmpty()) result.put(i + 1, Map.of(
-                "name", stack.getHoverName().getString(),
-                "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
-                "count", stack.getCount(),
-                "max_count", stack.getMaxStackSize()
-            ));
-        }
-        return result;
+    public final int getSecondsSinceLanded() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        return rocket == null ? 0 : rocket.getSecondsSinceGrounded();
     }
 
-    @LuaFunction
-    public List<Integer> listLaunchPadInputSlotIndexes() {
-        List<Integer> r = new ArrayList<>();
-        for (int s : blockEntity._inputSlots) r.add(s + 1);
-        return r;
-    }
-
-    @LuaFunction
-    public List<Integer> listLaunchPadOutputSlotIndexes() {
-        List<Integer> r = new ArrayList<>();
-        for (int s : blockEntity._outputSlots) r.add(s + 1);
-        return r;
+    @LuaFunction(mainThread = true)
+    public final String getTargetPlanet() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        if (rocket == null || rocket.targetPlanet.isEmpty()) return "none";
+        return rocket.targetPlanet;
     }
 
     @LuaFunction(mainThread = true)
     public boolean isRocketPresent() { return blockEntity.getRocket() != null; }
 
     @LuaFunction(mainThread = true)
-    public @Nullable Map<Integer, Map<String, ?>> listRocketInventory() {
+    public final boolean isRocketInventoryEmpty() throws LuaException {
         @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
-        if (rocket == null) return null;
-        Map<Integer, Map<String, ?>> result = new HashMap<>();
+        if (rocket == null) throw new LuaException("No rocket found");
         for (int i = 0; i < rocket.getInventory().getContainerSize(); i++) {
-            var stack = rocket.getInventory().getItem(i);
-            if (!stack.isEmpty()) result.put(i + 1, Map.of(
-                "name", stack.getHoverName().getString(),
-                "id", ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(),
-                "count", stack.getCount(),
-                "max_count", stack.getMaxStackSize()
-            ));
+            if (!rocket.getInventory().getItem(i).isEmpty()) return false;
         }
-        return result;
+        return true;
     }
 
     @LuaFunction(mainThread = true)
@@ -149,88 +110,63 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
 
     @LuaFunction(mainThread = true)
     public final void setRocketStatus(String status) throws LuaException {
-        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
         if (rocket == null) throw new LuaException("No rocket found");
         rocket.statusOverride = status == null ? "" : status;
     }
 
     @LuaFunction(mainThread = true)
     public final void setRocketName(String name) throws LuaException {
-        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
         if (rocket == null) throw new LuaException("No rocket found");
         rocket.setRocketName(name);
     }
 
-    @LuaFunction(mainThread = true)
-    public final int getFuel() { return blockEntity.getFuel(); }
+    // 燃料・カーゴ流体はv1.2.4でロケット自身のタンクに移管された。
+    // ロケットがランチパッドに無い(飛行中)場合でも、直前に発射したロケットを
+    // 追跡して値を返す(getRocketIncludingInFlight)。
 
     @LuaFunction(mainThread = true)
-    public final int getMaxFuel() { return blockEntity.getMaxFuel(); }
+    public final int getFuel() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        return rocket == null ? 0 : rocket.fuelTank.getFluidAmount();
+    }
 
     @LuaFunction(mainThread = true)
-    public final int getCargoFluid() { return blockEntity.getCargoFluid(); }
-
-    @LuaFunction(mainThread = true)
-    public final int getMaxCargoFluid() { return blockEntity.getMaxCargoFluid(); }
-
-    @LuaFunction(mainThread = true)
-    public final String getCargoFluidType() {
-        net.minecraftforge.fluids.FluidStack fluid = blockEntity.cargoFluidTank.getFluid();
-        if (fluid.isEmpty()) return "empty";
-        return net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fluid.getFluid()).toString();
+    public final int getMaxFuel() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        return rocket == null ? CargoRocketEntity.FUEL_CAPACITY : rocket.fuelTank.getCapacity();
     }
 
     @LuaFunction(mainThread = true)
     public final String getFuelType() {
-        net.minecraftforge.fluids.FluidStack fluid = blockEntity.fluidTank.getFluid();
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        if (rocket == null) return "empty";
+        var fluid = rocket.fuelTank.getFluid();
         if (fluid.isEmpty()) return "empty";
-        return net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fluid.getFluid()).toString();
+        var key = ForgeRegistries.FLUIDS.getKey(fluid.getFluid());
+        return key != null ? key.toString() : "empty";
     }
 
     @LuaFunction(mainThread = true)
-    public final void loadAllItems(IArguments args) throws LuaException {
-        if (blockEntity.getRocket() == null) throw new LuaException("No rocket found");
-        String filterId = parseItemId(args.optString(0, null));
-        for (int i = 1; i <= 9; i++) {
-            var stack = blockEntity.getStack(i - 1);
-            if (stack.isEmpty()) continue;
-            if (filterId != null && !ForgeRegistries.ITEMS.getKey(stack.getItem()).toString().equals(filterId)) continue;
-            @Nullable ItemMoveFailReason r = blockEntity.moveStackFromLaunchPadToRocket(i, i);
-            if (r != null && r != ItemMoveFailReason.TARGET_FULL)
-                switch (r) {
-                    case INVALID_SLOT -> throw new LuaException("Invalid slot: " + i);
-                    case NO_ROCKET -> throw new LuaException("No rocket found");
-                    default -> {}
-                }
-        }
+    public final int getCargoFluid() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        return rocket == null ? 0 : rocket.cargoFluidTank.getFluidAmount();
     }
 
     @LuaFunction(mainThread = true)
-    public final void unloadAllItems(IArguments args) throws LuaException {
-        @Nullable CargoRocketEntity rocket = blockEntity.getRocket();
-        if (rocket == null) throw new LuaException("No rocket found");
-        String filterId = parseItemId(args.optString(0, null));
-        for (int i = 1; i <= rocket.getInventory().getContainerSize(); i++) {
-            var stack = rocket.getInventory().getItem(i - 1);
-            if (stack.isEmpty()) continue;
-            if (filterId != null && !ForgeRegistries.ITEMS.getKey(stack.getItem()).toString().equals(filterId)) continue;
-            for (int target : blockEntity._outputSlots) {
-                @Nullable ItemMoveFailReason r = blockEntity.moveStackFromRocketToLaunchPad(i, target + 1);
-                if (r == null) break;
-                if (r != ItemMoveFailReason.TARGET_FULL)
-                    switch (r) {
-                        case INVALID_SLOT -> throw new LuaException("Invalid slot: " + i);
-                        case NO_ROCKET -> throw new LuaException("No rocket found");
-                        default -> {}
-                    }
-            }
-        }
+    public final int getMaxCargoFluid() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        return rocket == null ? CargoRocketEntity.CARGO_FLUID_CAPACITY : rocket.cargoFluidTank.getCapacity();
     }
 
-    @Nullable
-    private static String parseItemId(@Nullable String filter) {
-        if (filter == null || filter.isEmpty()) return null;
-        int b = filter.indexOf('[');
-        return b >= 0 ? filter.substring(0, b) : filter;
+    @LuaFunction(mainThread = true)
+    public final String getCargoFluidType() {
+        @Nullable CargoRocketEntity rocket = blockEntity.getRocketIncludingInFlight();
+        if (rocket == null) return "empty";
+        var fluid = rocket.cargoFluidTank.getFluid();
+        if (fluid.isEmpty()) return "empty";
+        var key = ForgeRegistries.FLUIDS.getKey(fluid.getFluid());
+        return key != null ? key.toString() : "empty";
     }
 }
