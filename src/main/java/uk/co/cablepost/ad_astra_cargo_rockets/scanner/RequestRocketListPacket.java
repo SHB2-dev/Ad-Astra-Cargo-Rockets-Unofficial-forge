@@ -48,29 +48,11 @@ public class RequestRocketListPacket {
                     info.flightState = rocket.getFlightState();
                     info.statusOverride = rocket.statusOverride;
 
-                    // 隣接ランチパッドの検索は飛行中なら無意味なのでスキップする
-                    // （上空にいるロケットの近くにランチパッドは無いのが正常なので、
-                    // 探索コストを省きつつ "unknown" へのフォールバックも防ぐ）。
-                    LaunchPadBlockEntity adjacentPad = "grounded".equals(info.flightState)
-                            ? findAdjacentLaunchPad(level, rocket) : null;
-
-                    String autoReason;
-                    if (!"grounded".equals(info.flightState)) {
-                        autoReason = "in_flight";
-                    } else {
-                        autoReason = adjacentPad != null ? adjacentPad.inferWaitReason() : "no_launchpad";
-                    }
+                    // 隣接するランチパッドがあれば自動推測の待機理由を取得
+                    String autoReason = "unknown";
+                    var be = findAdjacentLaunchPad(level, rocket);
+                    if (be != null) autoReason = be.inferWaitReason();
                     info.autoWaitReason = autoReason;
-
-                    if (adjacentPad != null) {
-                        info.hasLaunchPad = true;
-                        info.fuel = adjacentPad.getFuel();
-                        info.maxFuel = adjacentPad.getMaxFuel();
-                        info.fuelType = adjacentPad.getFuelTypeId();
-                        info.cargoFluid = adjacentPad.getCargoFluid();
-                        info.maxCargoFluid = adjacentPad.getMaxCargoFluid();
-                        info.cargoFluidType = adjacentPad.getCargoFluidTypeId();
-                    }
 
                     for (int i = 0; i < rocket.getInventory().getContainerSize(); i++) {
                         var stack = rocket.getInventory().getItem(i);

@@ -51,26 +51,13 @@ The launchpad has two separate fluid tanks and supports Forge energy (FE).
 ## 📥 `loadAllItems([filter])`
 Moves all items from the launchpad's inventory to the rocket's inventory.
 <br>If you specify an item ID, you can move only that item.
-<br>**[v1.2.3]** Returns the number of items that could **not** be moved (e.g. because the rocket
-inventory is full). Returns `0` on a fully successful load. Previously this silently dropped failed
-moves with no way to detect them; scripts can now check the return value to confirm everything was
-loaded before launching.
-<br>**[v1.2.3]** Also no longer requires matching slot numbers between the launchpad and rocket — it
-now finds any rocket slot with the same item (if not yet full) or any empty rocket slot, so loading
-several different item types in one call works correctly even if they land in launchpad slots that
-don't line up with free rocket slots.
 
 ## 📤 `unloadAllItems([filter])`
 Moves all items from the rocket's inventory to the launchpad's inventory.
 <br>If you specify an item ID, you can move only that item.
-<br>**[v1.2.3]** Returns the number of items that could **not** be moved (e.g. because the
-launchpad's output slots are full). Returns `0` on a fully successful unload.
 
 ### Parameters
 - `filter`_?_ (string) : Name of the item to load or unload (e.g. "minecraft:cobblestone")
-
-### Returns
-- `int`: Number of items left over that couldn't be moved (`0` means everything moved successfully).
 
 
 
@@ -300,29 +287,17 @@ rocket currently loaded in the world (across all dimensions), showing its name a
 Selecting a rocket from the list shows:
 
 - **Position & dimension** — where the rocket currently is.
-- **Flight state** — `Grounded`, `Ascending`, or `Descending`. While the rocket is airborne, the
-  Scanner reports `Currently in flight` directly instead of trying to find a nearby launchpad
-  (there usually isn't one at altitude).
+- **Flight state** — `Grounded`, `Ascending`, or `Descending`.
 - **Waiting on** — why the rocket is sitting on the pad. This is either:
-  - a message your Lua script explicitly set via `setRocketStatus(status)` (this also picks up
-    errors from `launch()` and unload retries automatically if you use the generator's scripts), or
+  - a message your Lua script explicitly set via `setRocketStatus(status)`, or
   - the mod's own best guess (`Not enough energy`, `Not enough fuel`, `Ready (idle)`, etc.) based on
     the nearby launchpad's current energy/fuel levels, if no script-provided status is set.
-- **Fuel / Cargo fluid** — the current and max amount in the launchpad the rocket is sitting on,
-  plus the fluid type. Only shown while grounded next to a launchpad; rockets don't carry fluid
-  tanks themselves, so this is unavailable mid-flight.
 - **Inventory** — every item currently aboard the rocket, slot by slot.
 - **Name field** — a text box to rename the rocket directly from the GUI. Renaming here has the same
   effect as calling `setRocketName(name)` from a script.
 
 The list refreshes automatically every couple of seconds while the GUI is open, or you can press the
 **Refresh** button to update immediately.
-
-> **Note on non-Latin names:** Minecraft's vanilla `EditBox` text field has known limitations with
-> IME input (e.g. Japanese, Chinese, Korean) on some platforms — composed text can render
-> incorrectly while typing. This is a Minecraft/LWJGL limitation outside the mod's control. Names
-> set via the Lua `setRocketName(name)` function are not affected by this, since they bypass the
-> text field entirely.
 
 ---
 

@@ -32,14 +32,9 @@ public class RenameRocketPacket {
         ctx.enqueueWork(() -> {
             var player = ctx.getSender();
             if (player == null || player.getServer() == null) return;
-            // 名前は最大32文字に制限（GUI崩れ防止）。サロゲートペアの途中で切らないよう
-            // offsetByCodePoints を使う（絵文字等の非BMP文字が含まれる場合の文字化け防止）。
+            // 名前は最大32文字に制限（GUI崩れ防止）
             String safeName = pkt.newName == null ? "" : pkt.newName;
-            if (safeName.length() > 32) {
-                int cut = Math.min(32, safeName.codePointCount(0, safeName.length()));
-                int end = safeName.offsetByCodePoints(0, cut);
-                safeName = safeName.substring(0, end);
-            }
+            if (safeName.length() > 32) safeName = safeName.substring(0, 32);
 
             for (ServerLevel level : player.getServer().getAllLevels()) {
                 var entity = level.getEntity(pkt.entityId);
