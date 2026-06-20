@@ -6,7 +6,7 @@ I'm new to modding. This mod may contain many bugs. I would really appreciate it
 This mod adds cargo rockets to *Ad Astra* and, when used in conjunction with *CC:tweaked*, allows for the automation of interplanetary item transport.
 
 # Added Features
-## [v1.3] Bug fixes: GUI sync, Scanner rename, Jade display, block updates, bucket removal
+## [v1.4] Bug fixes: GUI sync, Scanner rename, Jade display, block updates, bucket removal
 **This is a breaking change.** Filling/draining the rocket's fuel and cargo tanks with a bucket
 (both by right-clicking the launchpad and via the dedicated bucket slots in the rocket's inventory
 screen) has been **removed**. The tanks are now read-only from the player's perspective; the only
