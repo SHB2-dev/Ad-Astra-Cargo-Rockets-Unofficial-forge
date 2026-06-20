@@ -35,7 +35,9 @@ public class LaunchPadBlockPeripheral implements IPeripheral {
     @Override public void attach(IComputerAccess computer) { blockEntity.addComputer(computer); }
     @Override public void detach(IComputerAccess computer) { blockEntity.removeComputer(computer); }
     @Override public String getType() { return "cargo_rocket_launch_pad"; }
-    @Override public boolean equals(IPeripheral other) { return other instanceof LaunchPadBlockPeripheral; }
+    @Override public boolean equals(IPeripheral other) {
+        return other instanceof LaunchPadBlockPeripheral lbp && lbp.blockEntity == blockEntity;
+    }
 
     @LuaFunction(mainThread = true)
     public final void launch(String planet) throws LuaException {

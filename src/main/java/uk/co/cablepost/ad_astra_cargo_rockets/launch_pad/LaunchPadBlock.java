@@ -106,14 +106,30 @@ public class LaunchPadBlock extends BaseEntityBlock {
         super.onPlace(state, level, pos, oldState, moving);
         if (level.isClientSide) return;
         placeDummies(level, pos);
+        // ダミーブロック設置で中心・周囲ブロックの状態が変化するため、コンパレータ・パイプ等が
+        // すぐに追従できるよう3x3全マスへ明示的に近傍更新を通知する（角のダミーは中心と
+        // 面で接していないため、中心だけの通知では届かない）。
+        notifyPadArea(level, pos);
     }
 
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moving) {
         if (!state.is(newState.getBlock())) {
             removeDummies(level, pos);
+            // 破壊によって周囲のダミーブロックが無くなるため、3x3全マスへ近傍更新を通知する。
+            notifyPadArea(level, pos);
         }
         super.onRemove(state, level, pos, newState, moving);
+    }
+
+    /** 中心posを含む3x3全マスについて、それぞれの位置から近傍ブロックへ更新を通知する。 */
+    static void notifyPadArea(Level level, BlockPos center) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos p = center.offset(dx, 0, dz);
+                level.updateNeighborsAt(p, level.getBlockState(p).getBlock());
+            }
+        }
     }
 
     private void placeDummies(Level level, BlockPos center) {
@@ -150,27 +166,6 @@ public class LaunchPadBlock extends BaseEntityBlock {
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
         ItemStack stack = player.getItemInHand(hand);
 
-        // バケツ右クリックで液体をタンクに入れる
-        // 下面クリック = 燃料タンク、それ以外 = 貨物タンク
-        if (!stack.isEmpty() && stack.getItem() instanceof net.minecraft.world.item.BucketItem) {
-            if (!level.isClientSide) {
-                BlockEntity be = level.getBlockEntity(pos);
-                if (be instanceof LaunchPadBlockEntity launchPad) {
-                    net.minecraft.core.Direction face = hit.getDirection();
-                    launchPad.getCapability(
-                        net.minecraftforge.common.capabilities.ForgeCapabilities.FLUID_HANDLER,
-                        face).ifPresent(tankHandler -> {
-                        net.minecraftforge.fluids.FluidActionResult fluidResult =
-                            net.minecraftforge.fluids.FluidUtil.tryEmptyContainer(stack, tankHandler, Integer.MAX_VALUE, player, true);
-                        if (fluidResult.isSuccess()) {
-                            player.setItemInHand(hand, fluidResult.getResult());
-                        }
-                    });
-                }
-            }
-            return InteractionResult.sidedSuccess(level.isClientSide);
-        }
-
         if (!stack.isEmpty() && stack.getItem() instanceof CargoRocketItem cargoRocketItem) {
             if (level.isClientSide) return InteractionResult.SUCCESS;
             List<CargoRocketEntity> nearby = level.getEntitiesOfClass(
@@ -182,6 +177,9 @@ public class LaunchPadBlock extends BaseEntityBlock {
                     entity.setTier(cargoRocketItem.tier);
                     level.addFreshEntity(entity);
                     if (!player.getAbilities().instabuild) stack.shrink(1);
+                    // ロケット設置でランチパッドのパイプ・ホッパー委譲先が変わるため、
+                    // 3x3全マスの周囲ブロック(角のダミーブロックを含む)に更新を通知する。
+                    notifyPadArea(level, pos);
                 }
             }
             return InteractionResult.CONSUME;

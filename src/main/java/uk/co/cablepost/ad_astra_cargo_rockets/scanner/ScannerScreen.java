@@ -31,6 +31,10 @@ public class ScannerScreen extends Screen {
     // 名前変更直後、サーバーの応答が追いつく前に古い名前で上書きされるのを防ぐための一時保持
     private Integer pendingRenameEntityId = null;
     private String pendingRenameName = null;
+    // 名前欄に最後に値をセットした際の選択ロケットID。同じロケットを選択し続けている間は
+    // 2秒ごとの自動更新でnameBoxの内容を上書きしないようにするためのガード
+    // （これが無いと入力中でも自動更新でテキストが消えてしまう）。
+    private Integer nameBoxBoundEntityId = null;
 
     public ScannerScreen() {
         super(Component.literal("Rocket Scanner"));
@@ -122,8 +126,12 @@ public class ScannerScreen extends Screen {
     }
 
     private void updateSelectionFields() {
-        if (nameBox != null) {
+        Integer curId = selected != null ? selected.entityId : null;
+        // 選択ロケットが変わった時だけテキストを書き換える。同じロケットを選択し続けて
+        // いる間は、2秒ごとの自動更新が来ても入力中の文字を消さないようにする。
+        if (nameBox != null && !java.util.Objects.equals(curId, nameBoxBoundEntityId)) {
             nameBox.setValue(selected != null ? selected.name : "");
+            nameBoxBoundEntityId = curId;
         }
         if (renameButton != null) {
             renameButton.active = selected != null;
@@ -170,8 +178,13 @@ public class ScannerScreen extends Screen {
             return;
         }
 
+        int maxVisible = listH / ROW_HEIGHT;
+        int maxScroll = Math.max(0, rockets.size() - maxVisible);
+        if (scrollOffset > maxScroll) scrollOffset = maxScroll;
+
         int rowY = listY;
-        for (RocketInfo r : rockets) {
+        for (int i = scrollOffset; i < rockets.size(); i++) {
+            RocketInfo r = rockets.get(i);
             if (rowY + ROW_HEIGHT > listY + listH) break;
             boolean isSelected = selected != null && selected.entityId == r.entityId;
             boolean isHover = mouseX >= listX && mouseX <= listX + LIST_WIDTH
@@ -300,6 +313,19 @@ public class ScannerScreen extends Screen {
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        int ox = originX(), oy = originY(), ph = panelHeight();
+        int listX = ox + 4, listY = oy + 24, listH = ph - 24 - 28;
+        if (mouseX >= listX && mouseX <= listX + LIST_WIDTH && mouseY >= listY && mouseY < listY + listH) {
+            int maxVisible = listH / ROW_HEIGHT;
+            int maxScroll = Math.max(0, rockets.size() - maxVisible);
+            scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.signum(delta)));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override

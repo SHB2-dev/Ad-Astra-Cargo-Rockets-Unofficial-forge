@@ -71,6 +71,10 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
     private LazyOptional<IItemHandler> itemHandlerDelegate;
     private LazyOptional<IFluidHandler> fuelHandlerDelegate;
     private LazyOptional<IFluidHandler> cargoHandlerDelegate;
+    // Jade等、面を指定せず(side=null)汎用的に内容を問い合わせるツール向けの複合ハンドラ。
+    // side指定ありのfuel/cargoHandlerDelegateとは別に、燃料・カーゴ両方のタンクを
+    // 2タンクとして見せる読み取り専用ビュー。
+    private LazyOptional<IFluidHandler> combinedFluidHandlerDelegate;
 
     public LaunchPadBlockEntity(BlockPos pos, BlockState state) {
         super(
@@ -83,6 +87,7 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
         itemHandlerDelegate = LazyOptional.of(this::getDelegatedItemHandler);
         fuelHandlerDelegate = LazyOptional.of(() -> getDelegatedFluidHandler(Direction.DOWN));
         cargoHandlerDelegate = LazyOptional.of(() -> getDelegatedFluidHandler(Direction.UP));
+        combinedFluidHandlerDelegate = LazyOptional.of(this::getCombinedFluidHandlerForDisplay);
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, LaunchPadBlockEntity be) {
@@ -106,9 +111,31 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
             itemHandlerDelegate.invalidate();
             fuelHandlerDelegate.invalidate();
             cargoHandlerDelegate.invalidate();
+            combinedFluidHandlerDelegate.invalidate();
             itemHandlerDelegate = LazyOptional.of(this::getDelegatedItemHandler);
             fuelHandlerDelegate = LazyOptional.of(() -> getDelegatedFluidHandler(Direction.DOWN));
             cargoHandlerDelegate = LazyOptional.of(() -> getDelegatedFluidHandler(Direction.UP));
+            combinedFluidHandlerDelegate = LazyOptional.of(this::getCombinedFluidHandlerForDisplay);
+            // 委譲先のロケットが変わった = パイプ/ホッパー/コンパレータから見える内容量が
+            // 変化したタイミングなので、周囲ブロックに更新を通知する。
+            notifyPadNeighbors();
+        }
+    }
+
+    /**
+     * 中心ブロックだけでなく3x3の全ダミーブロック位置についても近傍に更新を通知する。
+     * level.updateNeighborsAt(center, ...)は中心と面で接する4方向+上下しか通知しないため、
+     * 中心と対角線上にある角の4マスのダミーブロック（そこに繋がるパイプ等）には届かない。
+     * パイプ・コンパレータ等がどのダミーブロックに繋がっていても確実に追従できるよう、
+     * 3x3全マスについて個別に通知する。
+     */
+    public void notifyPadNeighbors() {
+        if (level == null) return;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos pos = worldPosition.offset(dx, 0, dz);
+                level.updateNeighborsAt(pos, level.getBlockState(pos).getBlock());
+            }
         }
     }
 
@@ -118,6 +145,16 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
     @Override @Nullable
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    /**
+     * レンダリング範囲をブロック自体より広げる。モデルの実寸が3x3マルチブロックの
+     * 中心ブロックの当たり判定より大きいため、デフォルトのバウンディングボックスでは
+     * 中心ブロックを直接見ていない角度・距離からだとフラスタムカリングで描画が消えてしまう。
+     */
+    @Override
+    public AABB getRenderBoundingBox() {
+        return new AABB(worldPosition).inflate(2.0, 2.0, 2.0);
     }
 
     @Override
@@ -191,12 +228,40 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
         return side == Direction.DOWN ? rocket.fuelTank : rocket.cargoFluidTank;
     }
 
+    /**
+     * side指定なしで問い合わせるツール（Jade等のブロック情報表示）向けの読み取り専用ハンドラ。
+     * 燃料タンク・カーゴ流体タンクの両方を2つのタンクとして見せる。
+     * fill/drainは面指定ありの委譲先(fuel/cargoHandlerDelegate)経由でのみ行われる想定
+     * （パイプ・バケツ右クリックは常に具体的なDirectionを渡すため、ここを通らない）なので、
+     * 書き込みは何もしないダミー実装にする。
+     */
+    public IFluidHandler getCombinedFluidHandlerForDisplay() {
+        CargoRocketEntity rocket = getRocket();
+        if (rocket == null) return EMPTY_FLUID_HANDLER;
+        return new IFluidHandler() {
+            @Override public int getTanks() { return 2; }
+            @Override public @Nonnull FluidStack getFluidInTank(int tank) {
+                return tank == 0 ? rocket.fuelTank.getFluid() : rocket.cargoFluidTank.getFluid();
+            }
+            @Override public int getTankCapacity(int tank) {
+                return tank == 0 ? rocket.fuelTank.getCapacity() : rocket.cargoFluidTank.getCapacity();
+            }
+            @Override public boolean isFluidValid(int tank, @Nonnull FluidStack stack) { return true; }
+            @Override public int fill(FluidStack resource, FluidAction action) { return 0; }
+            @Override public @Nonnull FluidStack drain(FluidStack resource, FluidAction action) { return FluidStack.EMPTY; }
+            @Override public @Nonnull FluidStack drain(int maxDrain, FluidAction action) { return FluidStack.EMPTY; }
+        };
+    }
+
     @Override
     public @Nonnull <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.ITEM_HANDLER) {
             return itemHandlerDelegate.cast();
         }
         if (cap == ForgeCapabilities.FLUID_HANDLER) {
+            if (side == null) {
+                return combinedFluidHandlerDelegate.cast();
+            }
             return (side == Direction.DOWN ? fuelHandlerDelegate : cargoHandlerDelegate).cast();
         }
         return super.getCapability(cap, side);
@@ -208,6 +273,7 @@ public class LaunchPadBlockEntity extends AbstractMachineBlockEntity implements 
         itemHandlerDelegate.invalidate();
         fuelHandlerDelegate.invalidate();
         cargoHandlerDelegate.invalidate();
+        combinedFluidHandlerDelegate.invalidate();
     }
 
     public int calculateDifficulty(String planet) {

@@ -225,10 +225,8 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
                 _inventory.set(slot, ItemStack.of(slotTag));
             }
         }
-        // Energy: forceSetで制限なく復元
+        // Energy: EnergyStorageのmaxInsert制限を迂回してリフレクションで直接セット
         int savedEnergy = tag.getInt("Energy");
-        _energyStorage.receiveEnergy(savedEnergy, true); // simulate=true で容量確認
-        // リフレクションで直接セット
         try {
             java.lang.reflect.Field f = net.minecraftforge.energy.EnergyStorage.class.getDeclaredField("energy");
             f.setAccessible(true);

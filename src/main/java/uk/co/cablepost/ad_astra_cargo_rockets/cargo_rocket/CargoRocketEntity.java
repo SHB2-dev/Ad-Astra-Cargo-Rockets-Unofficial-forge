@@ -95,11 +95,6 @@ public class CargoRocketEntity extends Entity {
         if (nbt.contains("FuelTank")) fuelTank.readFromNBT(nbt.getCompound("FuelTank"));
         if (nbt.contains("CargoFluidTank")) cargoFluidTank.readFromNBT(nbt.getCompound("CargoFluidTank"));
         ContainerHelper.loadAllItems(nbt, inventory);
-        if (nbt.contains("BucketSlotsData")) {
-            net.minecraft.core.NonNullList<ItemStack> tmp = net.minecraft.core.NonNullList.withSize(2, ItemStack.EMPTY);
-            ContainerHelper.loadAllItems(nbt.getCompound("BucketSlotsData"), tmp);
-            for (int i = 0; i < 2; i++) bucketSlots.set(i, tmp.get(i));
-        }
     }
 
     @Override
@@ -116,9 +111,6 @@ public class CargoRocketEntity extends Entity {
         cargoFluidTank.writeToNBT(cargoTag);
         nbt.put("CargoFluidTank", cargoTag);
         ContainerHelper.saveAllItems(nbt, inventory);
-        CompoundTag bucketSaveTag = new CompoundTag();
-        ContainerHelper.saveAllItems(bucketSaveTag, bucketSlots);
-        nbt.put("BucketSlotsData", bucketSaveTag);
     }
 
     public void setTier(int tier) { entityData.set(TRACKED_TIER, tier); }
@@ -161,39 +153,6 @@ public class CargoRocketEntity extends Entity {
         return inventoryContainer;
     }
 
-    // 燃料バケツ・カーゴ流体バケツを置くための2スロット専用コンテナ([0]=燃料, [1]=カーゴ)。
-    // ここに満タンのバケツを置くとfuelTank/cargoFluidTankに注がれ空バケツに変わり、
-    // 空バケツを置くとタンクから汲み出して満タンバケツに変わる(RocketMenu側で処理)。
-    private final net.minecraft.core.NonNullList<ItemStack> bucketSlots =
-            net.minecraft.core.NonNullList.withSize(2, ItemStack.EMPTY);
-
-    private final net.minecraft.world.SimpleContainer bucketContainer = new net.minecraft.world.SimpleContainer(2) {
-        @Override public ItemStack getItem(int slot) { return bucketSlots.get(slot); }
-        @Override public void setItem(int slot, ItemStack stack) { bucketSlots.set(slot, stack); setChanged(); }
-        @Override public int getContainerSize() { return 2; }
-        @Override public boolean isEmpty() { return bucketSlots.stream().allMatch(ItemStack::isEmpty); }
-        @Override public ItemStack removeItem(int slot, int amount) {
-            ItemStack stack = bucketSlots.get(slot);
-            if (stack.isEmpty()) return ItemStack.EMPTY;
-            ItemStack split = stack.split(amount);
-            if (stack.isEmpty()) bucketSlots.set(slot, ItemStack.EMPTY);
-            setChanged();
-            return split;
-        }
-        @Override public ItemStack removeItemNoUpdate(int slot) {
-            ItemStack old = bucketSlots.get(slot);
-            bucketSlots.set(slot, ItemStack.EMPTY);
-            return old;
-        }
-        @Override public void clearContent() {
-            for (int i = 0; i < 2; i++) bucketSlots.set(i, ItemStack.EMPTY);
-        }
-    };
-
-    public net.minecraft.world.SimpleContainer getBucketSlots() {
-        return bucketContainer;
-    }
-
     @Override public boolean canBeCollidedWith() { return true; }
     @Override public boolean isPushable() { return false; }
     // プレイヤーが殴って攻撃できるようにする
@@ -234,10 +193,6 @@ public class CargoRocketEntity extends Entity {
             spawnAtLocation(inventory.get(i));
             inventory.set(i, ItemStack.EMPTY);
         }
-        for (int i = 0; i < bucketSlots.size(); i++) {
-            spawnAtLocation(bucketSlots.get(i));
-            bucketSlots.set(i, ItemStack.EMPTY);
-        }
     }
 
     private void dropSelf() {
@@ -250,10 +205,34 @@ public class CargoRocketEntity extends Entity {
         spawnAtLocation(new ItemStack(Items.DIRT));
     }
 
+    /**
+     * ロケットが破壊される位置周辺に着地しているランチパッドがあれば、
+     * パイプ・ホッパーの委譲先（getRocket()の戻り値）が無くなることになるため、
+     * そのランチパッドとその周囲ブロックに更新を通知する。
+     */
+    private void notifyAdjacentLaunchPad() {
+        if (level().isClientSide) return;
+        BlockPos pos = blockPosition();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    BlockPos check = pos.offset(dx, dy, dz);
+                    if (level().getBlockEntity(check) instanceof uk.co.cablepost.ad_astra_cargo_rockets.launch_pad.LaunchPadBlockEntity lp
+                            && lp.getRocket() == this) {
+                        // 中心だけでなく3x3全マス(角のダミーブロックを含む)へ通知する。
+                        lp.notifyPadNeighbors();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (level().isClientSide) return false;
         if (isInvulnerableTo(source)) return false;
+        notifyAdjacentLaunchPad();
         dropInventory();
         dropSelf();
         discard();
@@ -262,6 +241,7 @@ public class CargoRocketEntity extends Entity {
 
     public void killRocket() {
         if (!level().isClientSide) {
+            notifyAdjacentLaunchPad();
             dropInventory();
             dropSelf();
             discard();
@@ -333,18 +313,8 @@ public class CargoRocketEntity extends Entity {
         }
         lastFlightState = currentState;
 
-        // 同じ高度帯（上下2マス以内）に別のロケットが重なっている場合のみ衝突とみなす。
-        // 以前はXZ平面だけの判定だったため、ディメンション移動直後に高高度
-        // (targetWorld.getMaxBuildHeight()+200)へ出現した瞬間、地表近くに駐機している
-        // 別のロケットと誤って衝突判定されてしまうことがあった（月などで頻発していた
-        // 「着陸すると破壊される」バグの一因）。
-        List<CargoRocketEntity> intersecting = level().getEntitiesOfClass(
-                CargoRocketEntity.class, new AABB(blockPosition()).inflate(2, 2, 2),
-                e -> e.isAlive() && e.getId() != getId());
-        if (!intersecting.isEmpty()) {
-            level().explode(this, getX(), getY() + 2, getZ(), 5, Level.ExplosionInteraction.MOB);
-            dropInventory(); dropSelf(); kill(); return;
-        }
+        // 衝突判定はascentTick/descentTick内でより精密に行う。
+        // ここで広範囲の判定をすると隣接ランチパッドの駐機ロケットを誤爆する原因になるため削除。
         if (targetPlanet.isEmpty()) { descentTick(); } else { ascentTick(); }
     }
 
@@ -366,7 +336,7 @@ public class CargoRocketEntity extends Entity {
                 e -> e.isAlive() && e.getId() != getId() && "grounded".equals(e.getFlightState()));
         if (!below.isEmpty()) {
             level().explode(this, getX(), getY() - 0.5, getZ(), 5, Level.ExplosionInteraction.MOB);
-            dropInventory(); dropSelf(); kill(); return;
+            notifyAdjacentLaunchPad(); dropInventory(); dropSelf(); kill(); return;
         }
 
         Integer highestBlockY = null;
@@ -402,7 +372,7 @@ public class CargoRocketEntity extends Entity {
                 e -> e.isAlive() && e.getId() != getId());
         if (!above.isEmpty()) {
             level().explode(this, getX(), getY() - 4, getZ(), 5, Level.ExplosionInteraction.MOB);
-            dropInventory(); dropSelf(); kill(); return;
+            notifyAdjacentLaunchPad(); dropInventory(); dropSelf(); kill(); return;
         }
 
         boolean clear = true;
